@@ -1,3 +1,5 @@
+This code was written during the night, look out for misstakes!
+
 pip install chromadb openai pymupdf4llm tiktoken
 
 checkSplitting.py checks how the splitting looks in normal text and markdown.
