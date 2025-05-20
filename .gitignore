@@ -1,0 +1,5 @@
+/.env
+/.venv
+/findPDF.py
+/okFile
+/split_document_storage
