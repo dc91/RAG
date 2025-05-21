@@ -9,7 +9,7 @@ import pymupdf4llm
 import pathlib
 
 FOLDER_PATH = "okFile"
-OUTPUT_BASE = "./compare_splits"
+OUTPUT_BASE = "./compare_splits_sorted"
 
 def chunk_pdf_by_tokens(pdf_path, model="text-embedding-3-small", max_tokens=512):
     encoding = tiktoken.encoding_for_model(model)
@@ -20,7 +20,7 @@ def chunk_pdf_by_tokens(pdf_path, model="text-embedding-3-small", max_tokens=512
 
     text_and_pagenumber = []  # List [(page_number, page_text)]
     for i, page in enumerate(doc):
-        text = page.get_text()
+        text = page.get_text(sort=True)
         if text.strip():  # Skip empty pages
             text_and_pagenumber.append((i + 1, text))
     doc.close()

@@ -18,7 +18,7 @@ load_dotenv()
 
 # -----------------------------------------------#
 # -------------------Config----------------------#
-# -----------------------------------------------#
+# -----------------------------------------------# 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 PDF_DIRECTORY = "./okFile"
 COLLECTION_NAME = "split_document_collection"
@@ -130,7 +130,7 @@ def process_pdfs_and_insert(directory):
 # -----------------------------------------------#
 # -----------------Query Docs--------------------#
 # -----------------------------------------------#
-def query_documents(question, n_results=2):
+def query_documents(question, n_results=3):
     results = collection.query(query_texts=[question], n_results=n_results)
 
     # Extract the relevant chunks
@@ -150,7 +150,7 @@ def query_documents(question, n_results=2):
 
     return relevant_chunks
 
-question = "Hur påverkar ekonomin en individs hälsa?"
+question = "vad säger vårdpersonal om att vara sjuksköterska?"
 relevant_chunks = query_documents(question)
 
 
