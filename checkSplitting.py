@@ -91,6 +91,6 @@ for filename in os.listdir(FOLDER_PATH):
             f"./okFile/{filename}",
             write_images=True,
             filename=f"{filename_s}",
-            image_path=f"./compare_splits/{filename_s}/",
+            image_path=f"{OUTPUT_BASE}/{filename_s}/",
         )
         pathlib.Path(file_path_md).write_bytes(md_text.encode())
