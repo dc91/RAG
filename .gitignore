@@ -5,3 +5,8 @@
 /split_document_storage
 /compare_splits
 /compare_splits_sorted
+/temp_storage
+/questions
+/jupyter
+/ReadQuest.py
+/bigSplitter.py

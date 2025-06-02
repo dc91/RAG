@@ -2,7 +2,7 @@
 # https://docs.trychroma.com/docs/overview/getting-started
 # https://platform.openai.com/docs/guides/embeddings
 
-# great videos about chroma and embedding with openai 
+# great videos about chroma and embedding with openai
 # https://www.youtube.com/watch?v=jbLa0KBW-jY
 
 
@@ -13,27 +13,32 @@ from dotenv import load_dotenv
 import chromadb
 from openai import OpenAI
 from chromadb.utils import embedding_functions
+from tomlkit import parse, dumps # allows to keep formatting, the toml package does not keep all formatting
+# import toml # toml feels a bit faster though
 
 load_dotenv()
 
 # -----------------------------------------------#
 # -------------------Config----------------------#
-# -----------------------------------------------# 
+# -----------------------------------------------#
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-PDF_DIRECTORY = "./okFile"
+PDF_DIRECTORY = "./temp_storage"
+TOML_DIRECTORY = "questions/"
 COLLECTION_NAME = "split_document_collection"
 PERSIST_DIRECTORY = "split_document_storage"
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
+TOKEN_ENCODER = tiktoken.encoding_for_model(EMBEDDING_MODEL_NAME)
 MAX_TOKENS = 512
-
 # -----------------------------------------------#
-# --------------Embedding and ChromaDB-----------#
+# ------------ChromaDB and OpenAI Config---------#
 # -----------------------------------------------#
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
     api_key=OPENAI_KEY, model_name=EMBEDDING_MODEL_NAME
 )
 
 chroma_client = chromadb.PersistentClient(path=PERSIST_DIRECTORY)
+# If you want to delete a collection
+# chroma_client.delete_collection(name=COLLECTION_NAME)
 collection = chroma_client.get_or_create_collection(
     name=COLLECTION_NAME, embedding_function=openai_ef
 )
@@ -41,25 +46,32 @@ collection = chroma_client.get_or_create_collection(
 client = OpenAI(api_key=OPENAI_KEY)
 
 
-def chunk_pdf_by_tokens(pdf_path, model=EMBEDDING_MODEL_NAME, MAX_TOKENS=512):
-    encoding = tiktoken.encoding_for_model(model)
-
+# -----------------------------------------------#
+# --------------------Parse----------------------#
+# -----------------------------------------------#
+def parse_document(pdf_path):
     doc = fitz.open(pdf_path)
-    chunks = []
-    filename = os.path.basename(pdf_path)
-
     text_and_pagenumber = []  # List [(page_number, page_text)]
+    
     for i, page in enumerate(doc):
         text = page.get_text()
         if text.strip():  # Skip empty pages
             text_and_pagenumber.append((i + 1, text))
     doc.close()
+    return text_and_pagenumber
 
-    # Combine text with page metadata and tokenize
+# -----------------------------------------------#
+# -------------Tokenize and Chunk up-------------#
+# -----------------------------------------------#
+
+def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=512):
+    filename = os.path.basename(pdf_path)
+    text_and_pagenumber = parse_document(pdf_path)  # List [(page_number, page_text)]
+    chunks = []
     all_tokens = []
     token_page_map = []  # Keeps track of which page each token came from
     for page_number, page_text in text_and_pagenumber:
-        tokens = encoding.encode(page_text)
+        tokens = TOKEN_ENCODER.encode(page_text)
         all_tokens.extend(tokens)
         token_page_map.extend([page_number] * len(tokens))
 
@@ -70,7 +82,7 @@ def chunk_pdf_by_tokens(pdf_path, model=EMBEDDING_MODEL_NAME, MAX_TOKENS=512):
         start = i * MAX_TOKENS
         end = start + MAX_TOKENS
         token_chunk = all_tokens[start:end]
-        chunk_text = encoding.decode(token_chunk)
+        chunk_text = TOKEN_ENCODER.decode(token_chunk)
 
         # Majority page number for this chunk (for metadata)
         chunk_pages = token_page_map[start:end]
@@ -91,8 +103,9 @@ def chunk_pdf_by_tokens(pdf_path, model=EMBEDDING_MODEL_NAME, MAX_TOKENS=512):
 
     return chunks
 
+
 # -----------------------------------------------#
-# -------------Process All PDFs------------------#
+# -----Embedd PDFs and Insert to ChromaDB--------#
 # -----------------------------------------------#
 def process_pdfs_and_insert(directory):
     for filename in os.listdir(directory):
@@ -104,7 +117,6 @@ def process_pdfs_and_insert(directory):
             for chunk in chunks:
                 chunk_id = chunk["metadata"]["id"]
                 chunk_text = chunk["text"]
-
                 # Get embedding
                 print(f"Generating embedding for {chunk_id}")
                 embedding = (
@@ -114,8 +126,7 @@ def process_pdfs_and_insert(directory):
                     .data[0]
                     .embedding
                 )
-
-                # Insert into ChromaDB
+                # Insert into ChromaDB, upsert to not upload existing files
                 print(f"Inserting chunk {chunk_id} into ChromaDB")
                 collection.upsert(
                     ids=[chunk_id],
@@ -124,12 +135,29 @@ def process_pdfs_and_insert(directory):
                     metadatas=[chunk["metadata"]],
                 )
 
-# Run the process on all PDFs
-# process_pdfs_and_insert(PDF_DIRECTORY)
 
+# --------------------------------------------------------------#
+# --------------------Embedd all questions----------------------#
+# --------------------------------------------------------------#
+def add_embeddings_to_toml(toml_dir):
+    for filename in os.listdir(toml_dir):
+        if filename.endswith(".toml"):
+            with open(toml_dir + filename, "r", encoding="utf-8") as f:
+                toml_f = parse(f.read())
+            for question in toml_f["questions"]:
+                question["question_embedding"] = (
+                    client.embeddings.create(input=question["question"], model=EMBEDDING_MODEL_NAME)
+                    .data[0]
+                    .embedding
+                )
+            with open(toml_dir + "embedded_" + filename, "w", encoding="utf-8") as f:
+                f.write(dumps(toml_f))
+                
+                
 # -----------------------------------------------#
 # -----------------Query Docs--------------------#
 # -----------------------------------------------#
+# Chroma will first embed each query text with the collection's embedding function, if query_texts is used
 def query_documents(question, n_results=3):
     results = collection.query(query_texts=[question], n_results=n_results)
 
@@ -143,15 +171,33 @@ def query_documents(question, n_results=3):
         metadata = results["metadatas"][0][idx]  # Include metadata if needed
         print("-" * 60)
         print(
-            f"Found chunk: ID={doc_id}, Page={metadata.get('page_number')}, Distance={distance}"
+            f"Found chunk: ID={doc_id}, Page={metadata.get("page_number")}, Distance={distance}"
         )
         print("-" * 60)
         print(f"Content:\n{document}\n\n---\n")
 
     return relevant_chunks
 
-question = "vad säger vårdpersonal om att vara sjuksköterska?"
-relevant_chunks = query_documents(question)
+
+
+
+
+# --------------------------------------------------------------------#
+# --Parse, Tokenize, Chunk up, Embedd PDFs and insert into database---#
+# --------------------------------------------------------------------#
+# process_pdfs_and_insert(PDF_DIRECTORY)
+
+# --------------------------------------------------------------#
+# ----------------Write a question, Run a query-----------------#
+# --------------------------------------------------------------#
+# question = "Vilken information ska lämnas i en kontrolluppgift enligt 22 b kap. SFL"
+# relevant_chunks = query_documents(question)
+
+# --------------------------------------------------------------#
+# -------Write new toml files with embeddings included----------#
+# --------------------------------------------------------------#
+# add_embeddings_to_toml(TOML_DIRECTORY)
+
 
 
 
