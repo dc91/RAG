@@ -54,7 +54,7 @@ def parse_document(pdf_path):
     text_and_pagenumber = []  # List [(page_number, page_text)]
     
     for i, page in enumerate(doc):
-        text = page.get_text()
+        text = page.get_text(sort=True)
         if text.strip():  # Skip empty pages
             text_and_pagenumber.append((i + 1, text))
     doc.close()
