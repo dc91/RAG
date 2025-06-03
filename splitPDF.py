@@ -215,8 +215,16 @@ def q_doc(question, n_results=3):
         print("-" * 60)
         print("Question: ", question["question"])
         print("Answer expected: ", question["answer"])
-        print("\nFile from result: ", metadata.get('filename'), " | File from toml: ", question["files"][0]["file"], "... Right file" if metadata.get("filename") == question["files"][0]["file"] else "... Wrong file")
-        print("Pages from result", question["files"][0]["page_numbers"], " | Pages from toml: ", metadata.get('page_number'), "... Right pages" if metadata.get("page_number") in question["files"][0]["page_numbers"] else "... Wrong pages")
+        print("\nFile from result: ", metadata.get('filename'), " | File from toml: ", question["files"][0]["file"])
+        if metadata.get("filename") == question["files"][0]["file"]:
+            print("Right File!")
+            print("Pages from result", question["files"][0]["page_numbers"], " | Pages from toml: ", metadata.get('page_number'))
+            if metadata.get("page_number") in question["files"][0]["page_numbers"]:
+                print("Right Pages!")
+            else:
+                print("Wrong Pages!")
+        else:
+            print("Wrong File!")
         print("Distance between question and chunk embedding: ", distance)
         print("-" * 30)
         match_strings(document, question["answer"])
@@ -267,7 +275,7 @@ question_dict = get_embedded_questions(TOML_DIRECTORY)
 # --------------------------------------------------------------#
 # -------------Run an embedded query from toml files------------#
 # --------------------------------------------------------------#
-q_doc(question_dict["DC266"])
+q_doc(question_dict["DC001"])
 
 
 # --------------------------Not in this project scope--------------------------#
