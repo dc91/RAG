@@ -182,7 +182,7 @@ def get_embedded_questions(toml_dir):
 # --------------------------------------------------------------#
 # -------Get the data from toml files, with embedding-----------#
 # --------------------------------------------------------------#
-question_dict = get_embedded_questions(TOML_DIRECTORY)
+# question_dict = get_embedded_questions(TOML_DIRECTORY)
 
 # print(question_dict["DC253"]["files"][0]["page_numbers"])
 
@@ -235,7 +235,7 @@ def q_doc(question, n_results=3):
         match_strings(document, question["answer"])
             
 
-q_doc(question_dict["DC266"])
+# q_doc(question_dict["DC266"])
 
 # Chroma will first embed each query text with the collection's embedding function, if query_texts is used
 # def query_documents(question, n_results=3):
