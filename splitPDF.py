@@ -13,7 +13,10 @@ from dotenv import load_dotenv
 import chromadb
 from openai import OpenAI
 from chromadb.utils import embedding_functions
-from tomlkit import parse, dumps # allows to keep formatting, the toml package does not keep all formatting
+from tomlkit import (
+    parse,
+    dumps,
+)  # allows to keep formatting, the toml package does not keep all formatting
 # import toml # toml feels a bit faster though
 
 load_dotenv()
@@ -22,7 +25,7 @@ load_dotenv()
 # -------------------Config----------------------#
 # -----------------------------------------------#
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-PDF_DIRECTORY = "./temp_storage"
+PDF_DIRECTORY = "./okFile"
 TOML_DIRECTORY = "questions/"
 COLLECTION_NAME = "split_document_collection"
 PERSIST_DIRECTORY = "split_document_storage"
@@ -52,7 +55,7 @@ client = OpenAI(api_key=OPENAI_KEY)
 def parse_document(pdf_path):
     doc = fitz.open(pdf_path)
     text_and_pagenumber = []  # List [(page_number, page_text)]
-    
+
     for i, page in enumerate(doc):
         text = page.get_text(sort=True)
         if text.strip():  # Skip empty pages
@@ -60,9 +63,11 @@ def parse_document(pdf_path):
     doc.close()
     return text_and_pagenumber
 
+
 # -----------------------------------------------#
 # -------------Tokenize and Chunk up-------------#
 # -----------------------------------------------#
+
 
 def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=512):
     filename = os.path.basename(pdf_path)
@@ -146,40 +151,112 @@ def add_embeddings_to_toml(toml_dir):
                 toml_f = parse(f.read())
             for question in toml_f["questions"]:
                 question["question_embedding"] = (
-                    client.embeddings.create(input=question["question"], model=EMBEDDING_MODEL_NAME)
+                    client.embeddings.create(
+                        input=question["question"], model=EMBEDDING_MODEL_NAME
+                    )
                     .data[0]
                     .embedding
                 )
+
             with open(toml_dir + "embedded_" + filename, "w", encoding="utf-8") as f:
                 f.write(dumps(toml_f))
-                
-                
+
+
+def get_embedded_questions(toml_dir):
+    all_emdedded_questions = {}
+    for filename in os.listdir(toml_dir):
+        if filename.endswith(".toml"):
+            with open(toml_dir + filename, "r", encoding="utf-8") as f:
+                toml_f = parse(f.read())
+            # print(toml_f["questions"][2]["files"])
+            for question in toml_f["questions"]:
+                q_id = question["id"]
+                all_emdedded_questions[q_id] = question
+    return all_emdedded_questions
+
+# --------------------------------------------------------------#
+# -------Write new toml files with embeddings included----------#
+# --------------------------------------------------------------#
+# add_embeddings_to_toml(TOML_DIRECTORY)
+
+# --------------------------------------------------------------#
+# -------Get the data from toml files, with embedding-----------#
+# --------------------------------------------------------------#
+question_dict = get_embedded_questions(TOML_DIRECTORY)
+
+# print(question_dict["DC253"]["files"][0]["page_numbers"])
+
 # -----------------------------------------------#
 # -----------------Query Docs--------------------#
 # -----------------------------------------------#
-# Chroma will first embed each query text with the collection's embedding function, if query_texts is used
-def query_documents(question, n_results=3):
-    results = collection.query(query_texts=[question], n_results=n_results)
+def check_shrinking_matches(text_list, chunk, shrink_from_start=False):
+        text_len = len(text_list)
+        for i in range(text_len):
+            current = text_list[i:] if shrink_from_start else text_list[:text_len - i]
+            substring = "".join(current)
+            if substring in chunk:
+                idx = chunk.find(substring)
+                percent_match = 100.0 * len(current) / text_len
+                print(f"Found match {percent_match:.2f}%")
+                print("Text from answer: ", substring)
+                print("Text from chunk: ", chunk[max(idx - 50, 0): min(len(chunk), idx + 200)])
+                return True
+        return False
+    
+def match_strings(chunk_text, answer):
+    answer_chars = list(answer)
+    print("Shrinking from end and matching")
+    if check_shrinking_matches(answer_chars, chunk_text, shrink_from_start=False):
+        print("(Match from start)")
+    else:
+        print("(No match from start)")
+    print("-" * 30)
+    print("Shrinking from start and matching")
+    # Then try shrinking from the left
+    if check_shrinking_matches(answer_chars, chunk_text, shrink_from_start=True):
+        print("(Match from end)")
+    else:
+        print("(No match from end)")
 
-    # Extract the relevant chunks
-    # Flatten the list of lists
-    # results["documents"] is a list of lists, where each sublist corresponds to a document
-    relevant_chunks = [doc for sublist in results["documents"] for doc in sublist]
+def q_doc(question, n_results=3):
+    results = collection.query(query_embeddings=[question["question_embedding"]], n_results=n_results)
     for idx, document in enumerate(results["documents"][0]):
-        doc_id = results["ids"][0][idx]
         distance = results["distances"][0][idx]
         metadata = results["metadatas"][0][idx]  # Include metadata if needed
         print("-" * 60)
-        print(
-            f"Found chunk: ID={doc_id}, Page={metadata.get("page_number")}, Distance={distance}"
-        )
         print("-" * 60)
-        print(f"Content:\n{document}\n\n---\n")
+        print("File from result: ", metadata.get('filename'), "\nFile from toml", question["files"][0]["file"])
+        print("Right file" if metadata.get("filename") == question["files"][0]["file"] else "Wrong file")
+        print("Pages from result", question["files"][0]["page_numbers"], "\nPages from toml", metadata.get('page_number'))
+        print("Right pages" if metadata.get("page_number") in question["files"][0]["page_numbers"] else "Wrong pages")
+        print("Distance: ", distance)
+        print("Question: ", question["question"])
+        print("-" * 30)
+        match_strings(document, question["answer"])
+            
 
-    return relevant_chunks
+q_doc(question_dict["DC266"])
 
+# Chroma will first embed each query text with the collection's embedding function, if query_texts is used
+# def query_documents(question, n_results=3):
+#     results = collection.query(query_texts=[question], n_results=n_results)
 
+#     # Extract the relevant chunks
+#     # Flatten the list of lists
+#     # results["documents"] is a list of lists, where each sublist corresponds to a document
+#     relevant_chunks = [doc for sublist in results["documents"] for doc in sublist]
+#     for idx, document in enumerate(results["documents"][0]):
+#         doc_id = results["ids"][0][idx]
+#         distance = results["distances"][0][idx]
+#         metadata = results["metadatas"][0][idx]  # Include metadata if needed
+#         print("-" * 60)
+#         print(
+#             f"Found chunk: ID={doc_id}, Page={metadata.get('page_number')}, Distance={distance}"
+#         )
+#         print("-" * 60)
+#         print(f"Content:\n{document}\n\n---\n")
 
+#     return relevant_chunks
 
 
 # --------------------------------------------------------------------#
@@ -193,11 +270,6 @@ def query_documents(question, n_results=3):
 # question = "Vilken information ska lämnas i en kontrolluppgift enligt 22 b kap. SFL"
 # relevant_chunks = query_documents(question)
 
-# --------------------------------------------------------------#
-# -------Write new toml files with embeddings included----------#
-# --------------------------------------------------------------#
-# add_embeddings_to_toml(TOML_DIRECTORY)
-
 
 
 
@@ -210,31 +282,31 @@ def query_documents(question, n_results=3):
 # -----------------------------------------------#
 # -------------Response from OpenAI--------------#
 # -----------------------------------------------#
-def generate_response(question, relevant_chunks):
-    context = "\n\n".join(relevant_chunks)
-    prompt = (
-        "Du är en assistent som svarar på frågor. Använd den information som finns i de "
-        "angivna kontexten för att svara på din fråga. Om du inte kan svaret på frågan, "
-        "säg att du inte vet svaret. Var kortfattad och koncis."
-        "\nKontext:\n" + context + "\nFråga:\n" + question
-    )
+# def generate_response(question, relevant_chunks):
+#     context = "\n\n".join(relevant_chunks)
+#     prompt = (
+#         "Du är en assistent som svarar på frågor. Använd den information som finns i de "
+#         "angivna kontexten för att svara på din fråga. Om du inte kan svaret på frågan, "
+#         "säg att du inte vet svaret. Var kortfattad och koncis."
+#         "\nKontext:\n" + context + "\nFråga:\n" + question
+#     )
 
-    response = client.chat.completions.create(
-        model="gpt-4.1-nano",
-        messages=[
-            {
-                "role": "system",
-                "content": prompt,
-            },
-            {
-                "role": "user",
-                "content": question,
-            },
-        ],
-    )
+#     response = client.chat.completions.create(
+#         model="gpt-4.1-nano",
+#         messages=[
+#             {
+#                 "role": "system",
+#                 "content": prompt,
+#             },
+#             {
+#                 "role": "user",
+#                 "content": question,
+#             },
+#         ],
+#     )
 
-    answer = response.choices[0].message
-    return answer
+#     answer = response.choices[0].message
+#     return answer
 
 
 # answer = generate_response(question, relevant_chunks)
