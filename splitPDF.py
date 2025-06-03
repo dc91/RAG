@@ -242,19 +242,21 @@ def q_doc(question, n_results=3):
             metadata.get("filename"),
             " | File from toml: ",
             question["files"][0]["file"],
-            "... Right file"
-            if metadata.get("filename") == question["files"][0]["file"]
-            else "... Wrong file",
         )
-        print(
-            "Pages from result",
-            question["files"][0]["page_numbers"],
-            " | Pages from toml: ",
-            metadata.get("page_number"),
-            "... Right pages"
-            if metadata.get("page_number") in question["files"][0]["page_numbers"]
-            else "... Wrong pages",
-        )
+        if metadata.get("filename") == question["files"][0]["file"]:
+            print("Right File!")
+            print(
+                "Pages from result",
+                question["files"][0]["page_numbers"],
+                " | Pages from toml: ",
+                metadata.get("page_number"),
+            )
+            if metadata.get("page_number") in question["files"][0]["page_numbers"]:
+                print("Right Pages!")
+            else:
+                print("Wrong Pages!")
+        else:
+            print("Wrong File!")
         print("Distance between question and chunk embedding: ", distance)
         print("-" * 30)
         match_strings(document, question["answer"])
