@@ -49,6 +49,10 @@ collection = chroma_client.get_or_create_collection(
 client = OpenAI(api_key=OPENAI_KEY)
 
 
+# ------------------------------------------------------------------------#
+# --------------------Function definitions--------------------------------#
+# ---------------(Calls are done after all definitions)-------------------#
+
 # -----------------------------------------------#
 # --------------------Parse----------------------#
 # -----------------------------------------------#
@@ -163,7 +167,7 @@ def add_embeddings_to_toml(toml_dir):
 def get_embedded_questions(toml_dir):
     all_emdedded_questions = {}
     for filename in os.listdir(toml_dir):
-        if filename.endswith(".toml"):
+        if filename.endswith(".toml") and "embedded_" in filename:
             with open(toml_dir + filename, "r", encoding="utf-8") as f:
                 toml_f = parse(f.read())
             for question in toml_f["questions"]:
@@ -251,31 +255,75 @@ def query_documents(question, n_results=3):
     return relevant_chunks
 
 
+# ------------------------------------------------------------------------#
+# -----------------------Calling Functions--------------------------------#
+# ---------------(Some functions are only meant top be ran once)----------#
+
+# --Step 1
+# --This takes all pdf files in PDF_DIRECTORY and parses them.
+# --It also tokenizes, Chunks up text, creates embeddings.
+# --Then it inserts the embeddings to chromadb, with metadata.
+# --Only nedds to be run if you want to add documents to db.
+# --Otherwise, run only once. And then comment out
 # --------------------------------------------------------------------#
 # --Parse, Tokenize, Chunk up, Embedd PDFs and insert into database---#
 # --------------------------------------------------------------------#
 # process_pdfs_and_insert(PDF_DIRECTORY)
 
+# --OPTIONAL Step 1.5
+# --A quick test function, to see if it works.
+# --This is just a way to run a fast query from text (not embeddings) on the db.
+# --It also returns chunks for later use when generating responses from LLMs.
+# --But that's not necessary right now.
+# --Should be commented out, unless testing.
 # --------------------------------------------------------------#
 # --------------Write a (text) question, Run a query------------#
 # --------------------------------------------------------------#
 # question = "Hur introduceras asylbarnen till det svenska samhället på förskolan?"
 # relevant_chunks = query_documents(question)
 
+# --Step 2
+# --This takes all toml files in TOML_DIRECTORY and parses them.
+# --Then it adds a key "question_embedding" with the embedding array of the question as value
+# --It then saves a new file with "embedded_"-prefix, which is a copy of the old toml, 
+# ----but with the embeddings included in the file.
+# --Important to keep the "embedded_"-prefix, since other functions use that as a filter,
+# ----to choose which file to read.
+# --Only needs to be run once, to generate the files.
+# --Then just comment out.
 # --------------------------------------------------------------#
 # -------Write new toml files with embeddings included----------#
 # --------------------------------------------------------------#
 # add_embeddings_to_toml(TOML_DIRECTORY)
 
+
+# --Step 3.1
+# --This reads the toml files created in Step 2.
+# --It returns a dictionary representing the toml files.
+# --The key for each entry in the dictionary is the question id from the toml files.
+# --This dictionary will be used in queries and to match results
+# --Needs to run if you want to use the embeddings from the toml file,
+# ----and run a query with the function "q_doc"
 # --------------------------------------------------------------#
 # -------Get the data from toml files, with embedding-----------#
 # --------------------------------------------------------------#
-question_dict = get_embedded_questions(TOML_DIRECTORY)
+# question_dict = get_embedded_questions(TOML_DIRECTORY)
 
+# --Step 3.2, Last step for now.
+# --This runs a query on a specified question.
+# --The function checks the result of the query, gives distances between question and chunk embedding.
+# --Then we compare the metadata of the chunk with the data in the dictionary.
+# --We check for filename match, page number match and finally text match.
+# --For now, it just prints stuff. Going to elaborate this part soon
+# --Needs to run everytime you want to query with embeddings.
 # --------------------------------------------------------------#
 # -------------Run an embedded query from toml files------------#
 # --------------------------------------------------------------#
-q_doc(question_dict["DC001"])
+# q_doc(question_dict["DC001"])
+
+
+
+
 
 
 # --------------------------Not in this project scope--------------------------#
