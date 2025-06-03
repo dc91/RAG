@@ -173,8 +173,6 @@ def get_embedded_questions(toml_dir):
     return all_emdedded_questions
 
 
-
-
 # -----------------------------------------------#
 # -----------------Query Docs--------------------#
 # -----------------------------------------------#
@@ -223,9 +221,6 @@ def q_doc(question, n_results=3):
         print("-" * 30)
         match_strings(document, question["answer"])
             
-
-
-
 # Chroma will first embed each query text with the collection's embedding function, if query_texts is used
 def query_documents(question, n_results=3):
     results = collection.query(query_texts=[question], n_results=n_results)
@@ -255,8 +250,8 @@ def query_documents(question, n_results=3):
 # --------------------------------------------------------------#
 # ----------------Write a question, Run a query-----------------#
 # --------------------------------------------------------------#
-# question = "Vilken information ska lämnas i en kontrolluppgift enligt 22 b kap. SFL"
-# relevant_chunks = query_documents(question)
+question = "Hur introduceras asylbarnen till det svenska samhället på förskolan?"
+relevant_chunks = query_documents(question)
 
 # --------------------------------------------------------------#
 # -------Write new toml files with embeddings included----------#
