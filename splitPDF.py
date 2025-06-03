@@ -185,6 +185,7 @@ def check_shrinking_matches(text_list, chunk, shrink_from_start=False):
                 idx = chunk.find(substring)
                 percent_match = 100.0 * len(current) / text_len
                 print(f"Found match {percent_match:.2f}%")
+                print("Full text from answer: ", "".join(text_list))
                 print("Text from answer: ", substring)
                 print("Text from chunk: ", chunk[max(idx - 50, 0): min(len(chunk), idx + 200)])
                 return True
@@ -193,14 +194,14 @@ def check_shrinking_matches(text_list, chunk, shrink_from_start=False):
 def match_strings(chunk_text, answer):
     answer_chars = list(answer)
     print("Shrinking from end and matching")
-    if check_shrinking_matches(answer_chars, chunk_text, shrink_from_start=False):
+    if check_shrinking_matches(answer_chars, chunk_text.replace("\n", " "), shrink_from_start=False):
         print("(Match from start)")
     else:
         print("(No match from start)")
     print("-" * 30)
     print("Shrinking from start and matching")
     # Then try shrinking from the left
-    if check_shrinking_matches(answer_chars, chunk_text, shrink_from_start=True):
+    if check_shrinking_matches(answer_chars, chunk_text.replace("\n", " "), shrink_from_start=True):
         print("(Match from end)")
     else:
         print("(No match from end)")
@@ -250,8 +251,8 @@ def query_documents(question, n_results=3):
 # --------------------------------------------------------------#
 # ----------------Write a question, Run a query-----------------#
 # --------------------------------------------------------------#
-question = "Hur introduceras asylbarnen till det svenska samhället på förskolan?"
-relevant_chunks = query_documents(question)
+# question = "Hur introduceras asylbarnen till det svenska samhället på förskolan?"
+# relevant_chunks = query_documents(question)
 
 # --------------------------------------------------------------#
 # -------Write new toml files with embeddings included----------#
@@ -266,7 +267,7 @@ question_dict = get_embedded_questions(TOML_DIRECTORY)
 # --------------------------------------------------------------#
 # ------------------Run a query from toml files-----------------#
 # --------------------------------------------------------------#
-q_doc(question_dict["DC266"])
+q_doc(question_dict["DC252"])
 
 
 # --------------------------Not in this project scope--------------------------#
