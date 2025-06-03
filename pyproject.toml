@@ -1,0 +1,17 @@
+[project]
+name = "rag-dilan"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "chromadb>=1.0.12",
+    "dotenv>=0.9.9",
+    "fitz>=0.0.1.dev2",
+    "frontend>=0.0.3",
+    "openai>=1.83.0",
+    "pymupdf4llm>=0.0.24",
+    "tiktoken>=0.9.0",
+    "tomlkit>=0.13.2",
+    "tools>=1.0.2",
+]
