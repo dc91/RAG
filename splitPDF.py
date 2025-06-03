@@ -166,7 +166,6 @@ def get_embedded_questions(toml_dir):
         if filename.endswith(".toml"):
             with open(toml_dir + filename, "r", encoding="utf-8") as f:
                 toml_f = parse(f.read())
-            # print(toml_f["questions"][2]["files"])
             for question in toml_f["questions"]:
                 q_id = question["id"]
                 all_emdedded_questions[q_id] = question
@@ -185,43 +184,44 @@ def check_shrinking_matches(text_list, chunk, shrink_from_start=False):
                 idx = chunk.find(substring)
                 percent_match = 100.0 * len(current) / text_len
                 print(f"Found match {percent_match:.2f}%")
-                print("Full text from answer: ", "".join(text_list))
-                print("Text from answer: ", substring)
-                print("Text from chunk: ", chunk[max(idx - 50, 0): min(len(chunk), idx + 200)])
+                print("\nMatch from answer: ", substring)
+                print("\nPiece from chunk: ", chunk[max(idx - 50, 0): min(len(chunk), idx + 200)])
                 return True
         return False
     
 def match_strings(chunk_text, answer):
     answer_chars = list(answer)
-    print("Shrinking from end and matching")
-    if check_shrinking_matches(answer_chars, chunk_text.replace("\n", " "), shrink_from_start=False):
+    print("[Shrinking from end and matching...]")
+    if check_shrinking_matches(answer_chars, chunk_text, shrink_from_start=False):
         print("(Match from start)")
     else:
         print("(No match from start)")
     print("-" * 30)
-    print("Shrinking from start and matching")
+    print("[Shrinking from start and matching...]")
     # Then try shrinking from the left
-    if check_shrinking_matches(answer_chars, chunk_text.replace("\n", " "), shrink_from_start=True):
+    if check_shrinking_matches(answer_chars, chunk_text, shrink_from_start=True):
         print("(Match from end)")
     else:
         print("(No match from end)")
 
+#For query with embeddings
 def q_doc(question, n_results=3):
     results = collection.query(query_embeddings=[question["question_embedding"]], n_results=n_results)
     for idx, document in enumerate(results["documents"][0]):
         distance = results["distances"][0][idx]
         metadata = results["metadatas"][0][idx]  # Include metadata if needed
         print("-" * 60)
+        print("-" * 20, f"Result {idx + 1}", "-" * 20)
         print("-" * 60)
-        print("File from result: ", metadata.get('filename'), "\nFile from toml", question["files"][0]["file"])
-        print("Right file" if metadata.get("filename") == question["files"][0]["file"] else "Wrong file")
-        print("Pages from result", question["files"][0]["page_numbers"], "\nPages from toml", metadata.get('page_number'))
-        print("Right pages" if metadata.get("page_number") in question["files"][0]["page_numbers"] else "Wrong pages")
-        print("Distance: ", distance)
         print("Question: ", question["question"])
+        print("Answer expected: ", question["answer"])
+        print("\nFile from result: ", metadata.get('filename'), " | File from toml: ", question["files"][0]["file"], "... Right file" if metadata.get("filename") == question["files"][0]["file"] else "... Wrong file")
+        print("Pages from result", question["files"][0]["page_numbers"], " | Pages from toml: ", metadata.get('page_number'), "... Right pages" if metadata.get("page_number") in question["files"][0]["page_numbers"] else "... Wrong pages")
+        print("Distance between question and chunk embedding: ", distance)
         print("-" * 30)
         match_strings(document, question["answer"])
-            
+
+# For query with text            
 # Chroma will first embed each query text with the collection's embedding function, if query_texts is used
 def query_documents(question, n_results=3):
     results = collection.query(query_texts=[question], n_results=n_results)
@@ -249,7 +249,7 @@ def query_documents(question, n_results=3):
 # process_pdfs_and_insert(PDF_DIRECTORY)
 
 # --------------------------------------------------------------#
-# ----------------Write a question, Run a query-----------------#
+# --------------Write a (text) question, Run a query------------#
 # --------------------------------------------------------------#
 # question = "Hur introduceras asylbarnen till det svenska samhället på förskolan?"
 # relevant_chunks = query_documents(question)
@@ -265,9 +265,9 @@ def query_documents(question, n_results=3):
 question_dict = get_embedded_questions(TOML_DIRECTORY)
 
 # --------------------------------------------------------------#
-# ------------------Run a query from toml files-----------------#
+# -------------Run an embedded query from toml files------------#
 # --------------------------------------------------------------#
-q_doc(question_dict["DC252"])
+q_doc(question_dict["DC266"])
 
 
 # --------------------------Not in this project scope--------------------------#
