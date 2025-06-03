@@ -1,7 +1,7 @@
 This code was written during the night, look out for misstakes!
 
 ```
-pip install chromadb openai pymupdf4llm tiktoken tomlkit
+pip install sentence-transformers chromadb openai pymupdf4llm tiktoken tomlkit
 ```
 
 checkSplitting.py checks how the splitting looks in normal text and markdown.
