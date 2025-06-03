@@ -67,8 +67,6 @@ def parse_document(pdf_path):
 # -----------------------------------------------#
 # -------------Tokenize and Chunk up-------------#
 # -----------------------------------------------#
-
-
 def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=512):
     filename = os.path.basename(pdf_path)
     text_and_pagenumber = parse_document(pdf_path)  # List [(page_number, page_text)]
@@ -174,17 +172,8 @@ def get_embedded_questions(toml_dir):
                 all_emdedded_questions[q_id] = question
     return all_emdedded_questions
 
-# --------------------------------------------------------------#
-# -------Write new toml files with embeddings included----------#
-# --------------------------------------------------------------#
-# add_embeddings_to_toml(TOML_DIRECTORY)
 
-# --------------------------------------------------------------#
-# -------Get the data from toml files, with embedding-----------#
-# --------------------------------------------------------------#
-# question_dict = get_embedded_questions(TOML_DIRECTORY)
 
-# print(question_dict["DC253"]["files"][0]["page_numbers"])
 
 # -----------------------------------------------#
 # -----------------Query Docs--------------------#
@@ -235,28 +224,27 @@ def q_doc(question, n_results=3):
         match_strings(document, question["answer"])
             
 
-# q_doc(question_dict["DC266"])
+
 
 # Chroma will first embed each query text with the collection's embedding function, if query_texts is used
-# def query_documents(question, n_results=3):
-#     results = collection.query(query_texts=[question], n_results=n_results)
+def query_documents(question, n_results=3):
+    results = collection.query(query_texts=[question], n_results=n_results)
+    # Extract the relevant chunks
+    # Flatten the list of lists
+    # results["documents"] is a list of lists, where each sublist corresponds to a document
+    relevant_chunks = [doc for sublist in results["documents"] for doc in sublist]
+    for idx, document in enumerate(results["documents"][0]):
+        doc_id = results["ids"][0][idx]
+        distance = results["distances"][0][idx]
+        metadata = results["metadatas"][0][idx]  # Include metadata if needed
+        print("-" * 60)
+        print(
+            f"Found chunk: ID={doc_id}, Page={metadata.get('page_number')}, Distance={distance}"
+        )
+        print("-" * 60)
+        print(f"Content:\n{document}\n\n---\n")
 
-#     # Extract the relevant chunks
-#     # Flatten the list of lists
-#     # results["documents"] is a list of lists, where each sublist corresponds to a document
-#     relevant_chunks = [doc for sublist in results["documents"] for doc in sublist]
-#     for idx, document in enumerate(results["documents"][0]):
-#         doc_id = results["ids"][0][idx]
-#         distance = results["distances"][0][idx]
-#         metadata = results["metadatas"][0][idx]  # Include metadata if needed
-#         print("-" * 60)
-#         print(
-#             f"Found chunk: ID={doc_id}, Page={metadata.get('page_number')}, Distance={distance}"
-#         )
-#         print("-" * 60)
-#         print(f"Content:\n{document}\n\n---\n")
-
-#     return relevant_chunks
+    return relevant_chunks
 
 
 # --------------------------------------------------------------------#
@@ -270,7 +258,20 @@ def q_doc(question, n_results=3):
 # question = "Vilken information ska lämnas i en kontrolluppgift enligt 22 b kap. SFL"
 # relevant_chunks = query_documents(question)
 
+# --------------------------------------------------------------#
+# -------Write new toml files with embeddings included----------#
+# --------------------------------------------------------------#
+# add_embeddings_to_toml(TOML_DIRECTORY)
 
+# --------------------------------------------------------------#
+# -------Get the data from toml files, with embedding-----------#
+# --------------------------------------------------------------#
+question_dict = get_embedded_questions(TOML_DIRECTORY)
+
+# --------------------------------------------------------------#
+# ------------------Run a query from toml files-----------------#
+# --------------------------------------------------------------#
+q_doc(question_dict["DC266"])
 
 
 # --------------------------Not in this project scope--------------------------#
