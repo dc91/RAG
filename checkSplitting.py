@@ -7,9 +7,19 @@ import tiktoken
 import os
 import pymupdf4llm
 import pathlib
+import re
 
-FOLDER_PATH = "okFile"
-OUTPUT_BASE = "./compare_splits_sorted"
+FOLDER_PATH = "temp_storage"
+OUTPUT_BASE = "./compare_splits_sorted2"
+
+def normalize_text(input_text):
+    # Replace any sequence of whitespace (including newlines) with a single space
+    normalized = re.sub(r"\s+", " ", input_text.strip())
+    # Don't keep space if end of sentence
+    normalized = re.sub(r" +\.\s", ". ", normalized) 
+    # Remove split words at the end of lines
+    normalized = re.sub(r"-\n", "", normalized)
+    return normalized
 
 def chunk_pdf_by_tokens(pdf_path, model="text-embedding-3-small", max_tokens=512):
     encoding = tiktoken.encoding_for_model(model)
@@ -22,7 +32,8 @@ def chunk_pdf_by_tokens(pdf_path, model="text-embedding-3-small", max_tokens=512
     for i, page in enumerate(doc):
         text = page.get_text(sort=True)
         if text.strip():  # Skip empty pages
-            text_and_pagenumber.append((i + 1, text))
+            norm_text = normalize_text(text)
+            text_and_pagenumber.append((i + 1, norm_text + " "))
     doc.close()
 
     # Combine text with page metadata and tokenize
@@ -88,7 +99,7 @@ for filename in os.listdir(FOLDER_PATH):
                 f.write(chunk["text"] + "\n\n")
 
         md_text = pymupdf4llm.to_markdown(
-            f"./okFile/{filename}",
+            f"./{FOLDER_PATH}/{filename}",
             write_images=True,
             filename=f"{filename_s}",
             image_path=f"{OUTPUT_BASE}/{filename_s}/",

@@ -3,11 +3,14 @@
 /findPDF.py
 /okFile
 /split_document_storage
+/document_storage_norm
 /compare_splits
 /compare_splits_sorted
+/compare_splits_sorted2
 /temp_storage
 /questions
 /jupyter
 /ReadQuest.py
 /bigSplitter.py
 /questionsOG
+/cleanToml.py
