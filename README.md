@@ -6,6 +6,8 @@ checkSplitting.py checks how the splitting looks in normal text and markdown.
 
 splitPDF.py is for creating and upserting a collection in chromadb, once you know your files are good.
 
+plotResults.py plots the results. After plot the terminal waits for input, you can press any key at terminal to close the plots.
+
 More instructions incoming, but i tried to comment the code, so check it out and read the docs.
 
 chromadb:
