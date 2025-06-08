@@ -96,6 +96,7 @@ def plot_match_file_vs_page(df):
     plt.tight_layout()
     plt.show(block=False)
     
+    
 def plot_threshold_given_page_match(df):
     filtered_df = df[df["Page_Match"]]
     threshold_counts = filtered_df["Match_Threshold"].value_counts().reindex([True, False], fill_value=0)
@@ -142,8 +143,51 @@ def plot_matches_heatmap_split(df):
     g.figure.suptitle("Heatmap of Text Match Start vs End (%) by Threshold")
     plt.show(block=False)
 
+def plot_accuracy_precision_recall(df):
+    df['Query_ID'] = df['Result_Id'].str.replace(r'R[123]$', '', regex=True)
+    
+    # Compute Accuracy (regardless of Distance)
+    accuracy_df = df.groupby('Query_ID')['Filename_Match'].any()
+    accuracy = accuracy_df.mean()
+    print(f"Accuracy: {accuracy:.2f}")
+
+    # Filter by Distance (Random chpice of 0.8, we should think abot this)
+    filtered_df = df[df['Distance'] <= 0.8]
+
+    # Precision calculation
+    # Get matches after filtering
+    matches_after_filter = filtered_df.groupby('Query_ID')['Filename_Match'].any()
+
+    # Total queries with results after filtering
+    queries_with_results = filtered_df['Query_ID'].unique()
+
+    # Precision = matched queries / total queries with results
+    precision = matches_after_filter.sum() / len(queries_with_results)
+    print(f"Precision: {precision:.2f}")
+
+    # Recall calculation
+    # Find all query IDs (with and without results)
+    all_queries = df['Query_ID'].unique()
+
+    # Find queries with no results after filtering
+    queries_with_no_results = set(all_queries) - set(queries_with_results)
+
+    # Recall = matched queries / (matched queries + queries with no results)
+    recall = matches_after_filter.sum() / (matches_after_filter.sum() + len(queries_with_no_results))
+    print(f"Recall: {recall:.2f}")
+
+    # Plot
+    plt.figure(figsize=(8, 5))
+    plt.bar(['Accuracy', 'Precision', 'Recall'], [accuracy, precision, recall], color=['blue', 'green', 'orange'])
+    plt.ylabel('Score')
+    plt.ylim(0, 1)
+    plt.title('Evaluation Metrics')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.show(block=False)
+
 df = pd.read_csv("norm_queries.csv", sep=",", encoding="utf-8")
 
+plot_accuracy_precision_recall(df)
 plot_acc_by_cat(df)
 plot_match_by_diff(df)
 plot_matches_compare(df)
