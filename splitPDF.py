@@ -27,17 +27,17 @@ load_dotenv()
 # -------------------Config----------------------#
 # -----------------------------------------------#
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-PDF_DIRECTORY = "./temp_storage"
-TOML_DIRECTORY = "questions/"
-COLLECTION_NAME = "document_collection_norm"
-PERSIST_DIRECTORY = "document_storage_norm"
+PDF_DIRECTORY = "./pdf_data"
+TOML_DIRECTORY = "questions/embedded"
+COLLECTION_NAME = "document_collection_norm_all"
+PERSIST_DIRECTORY = "document_storage_norm_all"
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
 TOKEN_ENCODER = tiktoken.encoding_for_model(EMBEDDING_MODEL_NAME)
 MAX_TOKENS = 512
 RESULTS_PER_QUERY = 3
 MATCH_THRESHOLD = 50
-RESULTS_CSV_NAME = "norm_queries.csv"
-RESULTS_EXCEL_NAME = "norm_queries_excel.xlsx"
+RESULTS_CSV_NAME = "results/norm_queries.csv"
+RESULTS_EXCEL_NAME = "results/norm_queries_excel.xlsx"
 # -----------------------------------------------#
 # ------------ChromaDB and OpenAI Config---------#
 # -----------------------------------------------#
@@ -68,12 +68,13 @@ client = OpenAI(api_key=OPENAI_KEY)
 # --------------------Parse----------------------#
 # -----------------------------------------------#
 def normalize_text(input_text):
+    # Remove split words at the end of lines
+    normalized = re.sub(r"- ?\n", "", input_text.strip())
     # Replace any sequence of whitespace (including newlines) with a single space
-    normalized = re.sub(r"\s+", " ", input_text.strip())
+    normalized = re.sub(r"\s+", " ", normalized)
     # Don't keep space if end of sentence
     normalized = re.sub(r" +\.\s", ". ", normalized) 
-    # Remove split words at the end of lines
-    normalized = re.sub(r"-\n", "", normalized)
+    
     return normalized
 
 def parse_document(pdf_path):
@@ -235,6 +236,8 @@ def check_shrinking_matches(text_list, chunk, shrink_from_start=False, text_or_e
                     print("\nPiece from chunk: ", chunk)
                 return True, percent_match, len(substring)
         return False, 0, 0
+    
+    
     
 # This is just a function that calls check_shrinking_matches, and prints stuff around it
 # Only used with query_documents_one_embedding
@@ -443,7 +446,7 @@ def query_documents_text_input(question, n_results=3):
 # --------------------------------------------------------------#
 # -------Get the data from toml files, with embedding-----------#
 # --------------------------------------------------------------#
-question_dict = get_embedded_questions(TOML_DIRECTORY)
+# question_dict = get_embedded_questions(TOML_DIRECTORY)
 
 
 
@@ -462,7 +465,7 @@ question_dict = get_embedded_questions(TOML_DIRECTORY)
 # -------------Run an embedded query from toml files------------#
 # --------------------------------------------------------------#
 # query_documents_one_embedding(question_dict["PMCSKOLVERKET002"], n_results=RESULTS_PER_QUERY)
-query_documents_all_embeddings(question_dict, n_results=RESULTS_PER_QUERY)
+# query_documents_all_embeddings(question_dict, n_results=RESULTS_PER_QUERY)
 
 
 

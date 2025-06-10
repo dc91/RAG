@@ -185,7 +185,7 @@ def plot_accuracy_precision_recall(df):
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.show(block=False)
 
-df = pd.read_csv("norm_queries.csv", sep=",", encoding="utf-8")
+df = pd.read_csv("norm_queriesTT.csv", sep=",", encoding="utf-8")
 
 plot_accuracy_precision_recall(df)
 plot_acc_by_cat(df)

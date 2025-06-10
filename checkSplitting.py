@@ -10,15 +10,16 @@ import pathlib
 import re
 
 FOLDER_PATH = "temp_storage"
-OUTPUT_BASE = "./compare_splits_sorted2"
+OUTPUT_BASE = "./compare_splits_sorted"
 
 def normalize_text(input_text):
+    # Remove split words at the end of lines
+    normalized = re.sub(r"- ?\n", "", input_text.strip())
     # Replace any sequence of whitespace (including newlines) with a single space
-    normalized = re.sub(r"\s+", " ", input_text.strip())
+    normalized = re.sub(r"\s+", " ", normalized)
     # Don't keep space if end of sentence
     normalized = re.sub(r" +\.\s", ". ", normalized) 
-    # Remove split words at the end of lines
-    normalized = re.sub(r"-\n", "", normalized)
+    
     return normalized
 
 def chunk_pdf_by_tokens(pdf_path, model="text-embedding-3-small", max_tokens=512):
