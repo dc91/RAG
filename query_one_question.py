@@ -71,8 +71,6 @@ def check_shrinking_matches(text_list, chunk, shrink_from_start=False, tolerance
                 print(f"Match starts at char position: {idx}")
                 print(f"Match ends at char position: {idx + len(substring) - 1}")
                 print(f"Match length: {len(substring)}")
-                if not shrink_from_start:
-                    print("\nFull chunk (in lowercase): ", chunk)
                 return True, percent_of_answer_kept, substring_len
 
     return False, 0, 0
@@ -80,6 +78,8 @@ def check_shrinking_matches(text_list, chunk, shrink_from_start=False, tolerance
 
 def match_strings(chunk_text, answer):
     answer_chars = list(answer.lower())
+    print("Full chunk (in lowercase): ", chunk_text.lower())
+    print("-" * 30)
     print("[Shrinking from end and matching...]")
     match_from_start_bool = check_shrinking_matches(
         answer_chars, chunk_text, shrink_from_start=False, tolerance=TOLERANCE
