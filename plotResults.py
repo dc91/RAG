@@ -117,12 +117,12 @@ def plot_best_result_by_text_match(df):
     df["Result_Tag"] = df["Result_Id"].str[-2:]
     df["Question_Id"] = df["Result_Id"].str[:-2]
     best_results = df.loc[df.groupby("Question_Id")["Combined_Score"].idxmax()]
-    result_counts = best_results["Result_Tag"].value_counts().reindex(["R1", "R2", "R3"], fill_value=0)
+    result_counts = best_results["Result_Tag"].value_counts().reindex(["R1", "R2", "R3", "R4", "R5"], fill_value=0)
 
     plt.figure(figsize=(6, 5))
     plt.bar(result_counts.index, result_counts.values, color="cornflowerblue")
     plt.title("Best Result Based on Combined Text Match")
-    plt.xlabel("Result (R1, R2, R3)")
+    plt.xlabel("Result (R1, R2, R3, R4, R5)")
     plt.ylabel("Number of Times Best")
     plt.tight_layout()
     plt.show(block=False)
@@ -144,7 +144,7 @@ def plot_matches_heatmap_split(df):
     plt.show(block=False)
 
 def plot_accuracy_precision_recall(df):
-    df['Query_ID'] = df['Result_Id'].str.replace(r'R[123]$', '', regex=True)
+    df['Query_ID'] = df['Result_Id'].str[:-2]
     
     # Compute Accuracy (regardless of Distance)
     accuracy_df = df.groupby('Query_ID')['Filename_Match'].any()
@@ -171,10 +171,13 @@ def plot_accuracy_precision_recall(df):
 
     # Find queries with no results after filtering
     queries_with_no_results = set(all_queries) - set(queries_with_results)
-
+    
     # Recall = matched queries / (matched queries + queries with no results)
     recall = matches_after_filter.sum() / (matches_after_filter.sum() + len(queries_with_no_results))
     print(f"Recall: {recall:.2f}")
+    print("Queries with results after filtering:", len(queries_with_results))
+    print("Queries with no results after filtering:", len(queries_with_no_results))
+    print("Total number of queries:", len(all_queries))
 
     # Plot
     plt.figure(figsize=(8, 5))
@@ -185,7 +188,52 @@ def plot_accuracy_precision_recall(df):
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.show(block=False)
 
-df = pd.read_csv("norm_queriesTT.csv", sep=",", encoding="utf-8")
+
+
+def plot_match_file_vs_page_by_result(df):
+    # Extract Result Number (e.g., R1, R2, ..., R5)
+    df["Result_Num"] = df["Result_Id"].str.extract(r'(R[1-5])')
+
+    # Create combined match string
+    df["Match_Combo"] = df["Filename_Match"].astype(str) + "_File_" + df["Page_Match"].astype(str) + "_Page"
+
+    # Plot
+    plt.figure(figsize=(12, 6))
+    sns.countplot(data=df, x="Match_Combo", order=df["Match_Combo"].value_counts().index, hue="Result_Num")
+
+    plt.title("Filename and Page Matches by Result Number")
+    plt.xlabel("Match Combination (Filename_Page)")
+    plt.ylabel("Count")
+    plt.xticks(rotation=45, ha="right")
+    plt.legend(title="Result Number")
+    plt.tight_layout()
+    plt.show(block=False)
+    
+def plot_match_file_vs_page_by_result2(df):
+    # Extract Result Number (R1–R5) from Result_Id
+    df["Result_Num"] = df["Result_Id"].str.extract(r'(R[1-5])')
+
+    # Combine Filename and Page into one string
+    df["Match_Combo"] = df["Filename_Match"].astype(str) + "_File_" + df["Page_Match"].astype(str) + "_Page"
+
+    # Initialize FacetGrid with one subplot per result number
+    g = sns.FacetGrid(df, col="Result_Num", col_order=["R1", "R2", "R3", "R4", "R5"], 
+                      col_wrap=3, height=4, sharex=False, sharey=True)
+
+    # Map countplot onto each subplot
+    g.map(sns.countplot, "Match_Combo", order=df["Match_Combo"].value_counts().index)
+    
+    # Adjust plot aesthetics
+    g.set_titles("Result: {col_name}")
+    for ax in g.axes.flat:
+        ax.set_xticks(ax.get_xticks())
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+    g.set_axis_labels("Match Combination (Filename_Page)", "Count")
+
+    plt.tight_layout()
+    plt.show(block=False)
+    
+df = pd.read_csv("results/norm_queries.csv", sep=",", encoding="utf-8")
 
 plot_accuracy_precision_recall(df)
 plot_acc_by_cat(df)
@@ -195,5 +243,8 @@ plot_match_file_vs_page(df)
 plot_threshold_given_page_match(df)
 plot_best_result_by_text_match(df)
 plot_matches_heatmap_split(df)
+plot_match_file_vs_page_by_result(df)
+plot_match_file_vs_page_by_result2(df)
+
 
 input("Press Enter to close all plots...") # so the plots don't diasappear after render

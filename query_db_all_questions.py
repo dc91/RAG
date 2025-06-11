@@ -4,6 +4,10 @@ import pandas as pd
 from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 import tomli
+from Levenshtein import distance
+from Levenshtein import ratio
+from tqdm import tqdm
+from joblib import Parallel, delayed
 
 load_dotenv()
 
@@ -13,21 +17,36 @@ load_dotenv()
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 TOML_DIRECTORY = "questions/embedded/"
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
-COLLECTION_NAME = "document_collection_norm_all"
-PERSIST_DIRECTORY = "document_storage_norm_all"
+COLLECTION_NAME = "doc_collection_norm_all"
+PERSIST_DIRECTORY = "doc_storage_norm_all"
 MATCH_THRESHOLD = 50
-RESULTS_PER_QUERY = 3
-RESULTS_CSV_NAME = "results/norm_queries.csv"
-RESULTS_EXCEL_NAME = "results/norm_queries_excel.xlsx"
+MIN_ANS_LENGTH = 3
+RESULTS_PER_QUERY = 5
+TOLERANCE = 1
+MULTIPROCESSING = True if TOLERANCE > 0 else False
+if MULTIPROCESSING:
+    RESULTS_CSV_NAME = f"results/norm_queries_with_tol{TOLERANCE}.csv"
+    RESULTS_EXCEL_NAME = f"results/norm_queries_excel_tol{TOLERANCE}.xlsx"
+else:
+    RESULTS_CSV_NAME = "results/norm_queries_no_tol.csv"
+    RESULTS_EXCEL_NAME = "results/norm_queries_excel_no_tol.xlsx"
+
+
+def get_collection():
+    openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+        api_key=OPENAI_KEY, model_name=EMBEDDING_MODEL_NAME
+    )
+    chroma_client = chromadb.PersistentClient(path=PERSIST_DIRECTORY)
+    return chroma_client.get_or_create_collection(
+        name=COLLECTION_NAME, embedding_function=openai_ef
+    )
+
 
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
     api_key=OPENAI_KEY, model_name=EMBEDDING_MODEL_NAME
 )
 chroma_client = chromadb.PersistentClient(path=PERSIST_DIRECTORY)
-
-collection = chroma_client.get_or_create_collection(
-    name=COLLECTION_NAME, embedding_function=openai_ef
-)
+collection = get_collection()
 
 
 # -----------------------------------------------#
@@ -54,16 +73,52 @@ def get_embedded_questions(toml_dir):
 # until characters run out or match is found.
 # can change range of loop to not shrink until the very last character
 # since that is a bad match anyway.
-def check_shrinking_matches(
-    text_list, chunk, shrink_from_start=False):
+def check_shrinking_matches_no_tolerance(text_list, chunk, shrink_from_start=False):
+    chunk = chunk.lower()
     text_len = len(text_list)
-    for i in range(text_len - 1):
+    for i in range(text_len - MIN_ANS_LENGTH):
         current = text_list[i:] if shrink_from_start else text_list[: text_len - i]
-        substring = "".join(current)
-        if substring in chunk.lower():
+        substring = "".join(current).lower()
+        if substring in chunk:
             percent_match = 100.0 * len(current) / text_len
             return True, percent_match, len(substring)
     return False, 0, 0
+
+
+# A version with tolerance for character mismatch, but it is very slow. Some questions takes much longer than others.
+# The number of characters that can mismatch is set by the TOLERANCE variable at the top.
+def check_shrinking_matches_with_tolerance(text_list, chunk, shrink_from_start=False):
+    chunk = chunk.lower()
+    text_len = len(text_list)
+    chunk_len = len(chunk)
+    for i in range(text_len - MIN_ANS_LENGTH):
+        # Determine the current substring based on shrinking direction
+        current = text_list[i:] if shrink_from_start else text_list[: text_len - i]
+        substring = "".join(current).lower()
+        substring_len = len(substring)
+        # Use a sliding window over the chunk to compare with the substring
+        for j in range(chunk_len - substring_len + 1):
+            window = chunk[j : j + substring_len]
+            dist = distance(substring, window, score_cutoff=1, score_hint=0)
+            ratios = ratio(substring, window)
+            # Check if the distance is within the allowed tolerance
+            if dist <= TOLERANCE and ratios >= 0.92:
+                percent_of_answer_kept = 100.0 * len(current) / text_len
+                return True, percent_of_answer_kept, substring_len
+    return False, 0, 0
+
+
+# Selection of function type based on need for parallel processing
+def get_text_match_info(value, document):
+    func = (
+        check_shrinking_matches_with_tolerance
+        if TOLERANCE > 0
+        else check_shrinking_matches_no_tolerance
+    )
+    answer_list = list(value["answer"])
+    match_from_start = func(answer_list, document, shrink_from_start=False)
+    match_from_end = func(answer_list, document, shrink_from_start=True)
+    return (*match_from_start, *match_from_end)
 
 
 # Only concerns the excel file output
@@ -72,11 +127,11 @@ def escape_excel_formulas(val):
         return "'" + val
     return val
 
+
 # Save results to csv and xlsx files
 def save_data_from_result(all_rows, all_columns, csv_name, excel_name):
     df = pd.DataFrame(all_rows, columns=all_columns)
     df.to_csv(csv_name, encoding="utf-8", index=False)
-
     df = df.map(escape_excel_formulas)
     with pd.ExcelWriter(excel_name) as writer:
         df.to_excel(writer, sheet_name="Test_Query", index=False)
@@ -85,38 +140,27 @@ def save_data_from_result(all_rows, all_columns, csv_name, excel_name):
 # -----------------------------------------------#
 # --------------Query function-------------------#
 # -----------------------------------------------#
-def query_documents_all_embeddings(question, n_results=3):
-    all_columns = [
-        "Result_Id",
-        "Correct_File",
-        "Guessed_File",
-        "Filename_Match",
-        "Correct_Pages",
-        "Guessed_Page",
-        "Page_Match",
-        "Distance",
-        "Text_Match_Start_Percent",
-        "Match_Length_Start",
-        "Text_Match_End_Percent",
-        "Match_Length_End",
-        "No_match",
-        "Match_Threshold",
-        "Difficulty",
-        "Category",
-        "Expected_answer",
-        "Question",
-        "Returned_Chunk",
-        "Chunk_Id",
+all_columns = [
+        "Result_Id", "Correct_File", "Guessed_File",
+        "Filename_Match", "Correct_Pages", "Guessed_Page",
+        "Page_Match", "Distance", "Text_Match_Start_Percent",
+        "Match_Length_Start", "Text_Match_End_Percent",
+        "Match_Length_End", "No_match", "Match_Threshold",
+        "Difficulty", "Category", "Expected_answer",
+        "Question", "Returned_Chunk", "Chunk_Id",
     ]
+
+
+def query_documents_all_embeddings(question, n_results=3):
     all_rows = []
-    for value in question.values():
+    for value in tqdm(question.values(), desc="Processing questions"):
         results = collection.query(
             query_embeddings=[value["question_embedding"]], n_results=n_results
         )
-        for idx, document in enumerate(results["documents"][0]):  
+        for idx, document in enumerate(results["documents"][0]):
             # document here refers to chunks, due to chromadb naming
             # so we are looking at the results for returned chunks here.
-            distance = results["distances"][0][idx]
+            distance_val = results["distances"][0][idx]
             metadata = results["metadatas"][0][idx]
 
             correct_file = value["files"][0]["file"]
@@ -126,31 +170,16 @@ def query_documents_all_embeddings(question, n_results=3):
             correct_pages = value["files"][0]["page_numbers"]
             guessed_page = metadata.get("page_number")
             # Don't check for page matches if wrong file
-            if filename_match:
-                page_match = guessed_page in correct_pages
-            else:
-                page_match = False
+            page_match = guessed_page in correct_pages if filename_match else False
 
-            match_from_start_bool, match_from_start_float, match_from_start_length = (
-                check_shrinking_matches(
-                    list(value["answer"].lower()), document, shrink_from_start=False
-                )
-            )
-            match_from_end_bool, match_from_end_float, match_from_end_length = (
-                check_shrinking_matches(
-                    list(value["answer"].lower()), document, shrink_from_start=True
-                )
-            )
+            (match_from_start_bool, match_from_start_float,
+                match_from_start_length, match_from_end_bool,
+                match_from_end_float, match_from_end_length,) = get_text_match_info(value, document)
             # We need to figure out what the thershold is, and how to calculate it. This adds both matches.
             # We could use match length somehow as well?
             match_threshold = (
-                True
-                if (match_from_start_float + match_from_end_float > MATCH_THRESHOLD)
-                else False
+                match_from_start_float + match_from_end_float > MATCH_THRESHOLD
             )
-
-            text_match_start_value = match_from_start_float
-            text_match_end_value = match_from_end_float
             no_match = not (match_from_start_bool or match_from_end_bool)
             result_id = f"{value['id']}R{idx + 1}"
 
@@ -162,10 +191,10 @@ def query_documents_all_embeddings(question, n_results=3):
                 correct_pages,
                 guessed_page,
                 page_match,
-                distance,
-                text_match_start_value,
+                distance_val,
+                match_from_start_float,
                 match_from_start_length,
-                text_match_end_value,
+                match_from_end_float,
                 match_from_end_length,
                 no_match,
                 match_threshold,
@@ -181,12 +210,87 @@ def query_documents_all_embeddings(question, n_results=3):
     save_data_from_result(all_rows, all_columns, RESULTS_CSV_NAME, RESULTS_EXCEL_NAME)
 
 
-# --------------------------------------------------------------#
-# -------Get the data from toml files, with embedding-----------#
-# --------------------------------------------------------------#
-question_dict = get_embedded_questions(TOML_DIRECTORY)
+# Same as above but for parallel processing
+def process_question(value, n_results):
+    collection = get_collection()
+    results = collection.query(
+        query_embeddings=[value["question_embedding"]], n_results=n_results
+    )
+    all_rows = []
+    for idx, document in enumerate(results["documents"][0]):
+        distance_val = results["distances"][0][idx]
+        metadata = results["metadatas"][0][idx]
 
-# --------------------------------------------------------------#
-# -------------Run an embedded query from toml files------------#
-# --------------------------------------------------------------#
-query_documents_all_embeddings(question_dict, n_results=RESULTS_PER_QUERY)
+        correct_file = value["files"][0]["file"]
+        guessed_file = metadata.get("filename")
+        filename_match = guessed_file == correct_file
+
+        correct_pages = value["files"][0]["page_numbers"]
+        guessed_page = metadata.get("page_number")
+        page_match = guessed_page in correct_pages if filename_match else False
+
+        (
+            match_from_start_bool,
+            match_from_start_float,
+            match_from_start_length,
+            match_from_end_bool,
+            match_from_end_float,
+            match_from_end_length,
+        ) = get_text_match_info(value, document)
+
+        match_threshold = (
+            match_from_start_float + match_from_end_float > MATCH_THRESHOLD
+        )
+        no_match = not (match_from_start_bool or match_from_end_bool)
+        result_id = f"{value['id']}R{idx + 1}"
+
+        row = [
+            result_id,
+            correct_file,
+            guessed_file,
+            filename_match,
+            correct_pages,
+            guessed_page,
+            page_match,
+            distance_val,
+            match_from_start_float,
+            match_from_start_length,
+            match_from_end_float,
+            match_from_end_length,
+            no_match,
+            match_threshold,
+            value["difficulty"],
+            value["category"],
+            value["answer"],
+            value["question"],
+            document,
+            results["ids"][0][idx],
+        ]
+        all_rows.append(row)
+    return all_rows
+
+
+def query_documents_all_embeddings_parallel(question_dict, n_results=3):
+    results = Parallel(n_jobs=-1)(
+        delayed(process_question)(val, n_results)
+        for val in tqdm(question_dict.values(), desc="Parallel Processing")
+    )
+
+    all_rows = [row for result in results for row in result]
+    save_data_from_result(all_rows, all_columns, RESULTS_CSV_NAME, RESULTS_EXCEL_NAME)
+
+if __name__ == "__main__":
+    # --------------------------------------------------------------#
+    # -------Get the data from toml files, with embedding-----------#
+    # --------------------------------------------------------------#
+    question_dict = get_embedded_questions(TOML_DIRECTORY)
+
+    # --------------------------------------------------------------#
+    # -------------Run an embedded query from toml files------------#
+    # --------------------------------------------------------------#
+    if MULTIPROCESSING:
+        query_documents_all_embeddings_parallel(
+            question_dict, n_results=RESULTS_PER_QUERY
+        )
+    else:
+        query_documents_all_embeddings(question_dict, n_results=RESULTS_PER_QUERY)

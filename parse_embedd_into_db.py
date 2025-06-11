@@ -14,8 +14,8 @@ load_dotenv()
 # -----------------------------------------------#
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 PDF_DIRECTORY = "./pdf_data"
-COLLECTION_NAME = "document_collection_norm_all"
-PERSIST_DIRECTORY = "document_storage_norm_all"
+COLLECTION_NAME = "doc_collection_norm_all"
+PERSIST_DIRECTORY = "doc_storage_norm_all"
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
 TOKEN_ENCODER = tiktoken.encoding_for_model(EMBEDDING_MODEL_NAME)
 MAX_TOKENS = 512

@@ -17,9 +17,11 @@ from tomlkit import (
     parse,
     dumps,
 )  # allows to keep formatting, but slow. So only used for creating toml files
-import tomli # Used to read the toml files fast.
+import tomli  # Used to read the toml files fast.
 import pandas as pd
 import re
+from Levenshtein import distance
+from Levenshtein import ratio
 
 load_dotenv()
 
@@ -29,8 +31,8 @@ load_dotenv()
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 PDF_DIRECTORY = "./pdf_data"
 TOML_DIRECTORY = "questions/embedded"
-COLLECTION_NAME = "document_collection_norm_all"
-PERSIST_DIRECTORY = "document_storage_norm_all"
+COLLECTION_NAME = "doc_collection_norm_all"
+PERSIST_DIRECTORY = "doc_storage_norm_all"
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
 TOKEN_ENCODER = tiktoken.encoding_for_model(EMBEDDING_MODEL_NAME)
 MAX_TOKENS = 512
@@ -58,11 +60,12 @@ client = OpenAI(api_key=OPENAI_KEY)
 # results = collection.get(limit=5)
 # for doc in results["documents"]:
 #     print(doc)
-    
-    
+
+
 # ------------------------------------------------------------------------#
 # --------------------Function definitions--------------------------------#
 # ---------------(Calls are done after all definitions)-------------------#
+
 
 # -----------------------------------------------#
 # --------------------Parse----------------------#
@@ -73,9 +76,10 @@ def normalize_text(input_text):
     # Replace any sequence of whitespace (including newlines) with a single space
     normalized = re.sub(r"\s+", " ", normalized)
     # Don't keep space if end of sentence
-    normalized = re.sub(r" +\.\s", ". ", normalized) 
-    
+    normalized = re.sub(r" +\.\s", ". ", normalized)
+
     return normalized
+
 
 def parse_document(pdf_path):
     doc = fitz.open(pdf_path)
@@ -90,6 +94,8 @@ def parse_document(pdf_path):
     # Test print
     # print(text_and_pagenumber)
     return text_and_pagenumber
+
+
 # Test call
 # parse_document(pdf_path = os.path.join(PDF_DIRECTORY, "12_BERÄTTELSER_OM_SKAM.pdf"))
 
@@ -136,6 +142,8 @@ def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=512):
         # Test print
         # print("Chunk", i, ": ", chunk_text)
     return chunks
+
+
 # Test call
 # chunk_pdf_by_tokens(os.path.join(PDF_DIRECTORY, "12_BERÄTTELSER_OM_SKAM.pdf"))
 
@@ -172,6 +180,8 @@ def process_pdfs_and_insert(directory):
                     embeddings=[embedding],
                     metadatas=[chunk["metadata"]],
                 )
+
+
 # Test call
 # process_pdfs_and_insert(PDF_DIRECTORY)
 
@@ -196,6 +206,7 @@ def add_embeddings_to_toml(toml_dir):
             with open(toml_dir + "embedded_" + filename, "w", encoding="utf-8") as f:
                 f.write(dumps(toml_f))
 
+
 # Reads the toml files, with the embedded questions
 def get_embedded_questions(toml_dir):
     all_embedded_questions = {}
@@ -219,55 +230,97 @@ def get_embedded_questions(toml_dir):
 # --------------Helping Functions----------------#
 # -----------------------------------------------#
 
-def check_shrinking_matches(text_list, chunk, shrink_from_start=False, text_or_embedding="embedding"):
-        text_len = len(text_list)
-        for i in range(text_len - 1):
-            current = text_list[i:] if shrink_from_start else text_list[:text_len - i]
-            substring = "".join(current)
-            if substring in chunk.lower():
-                percent_match = 100.0 * len(current) / text_len
+
+def check_shrinking_matches(text_list, chunk, shrink_from_start=False, text_or_embedding="text", tolerance=1):
+    chunk = chunk.lower()
+    text_len = len(text_list)
+    chunk_len = len(chunk)
+
+    for i in range(text_len - 3):
+        # Determine the current substring based on shrinking direction
+        current = text_list[i:] if shrink_from_start else text_list[: text_len - i]
+        substring = "".join(current).lower()
+        substring_len = len(substring)
+        # Use a sliding window over the chunk to compare with the substring
+        for j in range(chunk_len - substring_len + 1):
+            window = chunk[j:j + substring_len]
+            dist = distance(substring, window, score_cutoff=1, score_hint=0)
+            # Check if the distance is within the allowed tolerance
+            if dist <= tolerance:
+                percent_of_answer_kept = 100.0 * len(current) / text_len
+                ratios = ratio(substring, window)
                 if text_or_embedding == "text":
-                    idx = chunk.find(substring)
-                    print(f"Found match {percent_match:.2f}%")
+                    idx = chunk.find(window)
+                    print(f"Match within sliding window: \n'{substring}' \n== \n'{window}'")
+                    print(f"Ratio match within window: {ratios}")
+                    print(f"Percent of answer kept: {percent_of_answer_kept:.2f}%, {len(substring)}/{text_len} characters kept")
                     print(f"Match starts at char position: {idx}")
-                    print(f"Match ends at char position: {idx + len(substring)}")
+                    print(f"Match ends at char position: {idx + len(substring) - 1}")
                     print(f"Match length: {len(substring)}")
-                    print("\nMatch from answer: ", substring)
-                    print("\nPiece from chunk: ", chunk)
-                return True, percent_match, len(substring)
-        return False, 0, 0
-    
-    
-    
+                    if not shrink_from_start:
+                        print("\nPiece from chunk: ", chunk)
+                return True, percent_of_answer_kept, substring_len
+
+    return False, 0, 0
+
+
+# def check_shrinking_matches(text_list, chunk, shrink_from_start=False, text_or_embedding="embedding"):
+#     chunk = chunk.lower()
+#     text_len = len(text_list)
+#     for i in range(text_len - 3):
+#         current = text_list[i:] if shrink_from_start else text_list[: text_len - i]
+#         substring = "".join(current)
+#         if substring in chunk.lower():
+#             percent_match = 100.0 * len(current) / text_len
+#             if text_or_embedding == "text":
+#                 idx = chunk.find(substring)
+#                 print(f"Found match {percent_match:.2f}%")
+#                 print(f"Match starts at char position: {idx + 1}")
+#                 print(f"Match ends at char position: {idx + len(substring)}")
+#                 print(f"Match length: {len(substring)}")
+#                 print("\nMatch from answer: ", substring)
+#                 print("\nPiece from chunk: ", chunk)
+#             return True, percent_match, len(substring)
+#     return False, 0, 0
+
+
 # This is just a function that calls check_shrinking_matches, and prints stuff around it
 # Only used with query_documents_one_embedding
 def match_strings(chunk_text, answer):
     answer_chars = list(answer.lower())
     print("[Shrinking from end and matching...]")
-    match_from_start_bool = check_shrinking_matches(answer_chars, chunk_text, shrink_from_start=False, text_or_embedding="text")[0]
+    match_from_start_bool = check_shrinking_matches(
+        answer_chars, chunk_text, shrink_from_start=False, text_or_embedding="text"
+    )[0]
     if match_from_start_bool:
         print("(Match from start)")
     else:
         print("(No match from start)")
     print("-" * 30)
     print("[Shrinking from start and matching...]")
-    match_from_end_bool = check_shrinking_matches(answer_chars, chunk_text, shrink_from_start=True, text_or_embedding="text")[0]
+    match_from_end_bool = check_shrinking_matches(
+        answer_chars, chunk_text, shrink_from_start=True, text_or_embedding="text"
+    )[0]
     if match_from_end_bool:
         print("(Match from end)")
     else:
         print("(No match from end)")
     return match_from_start_bool, match_from_end_bool
 
+
 # Only concerns the excel file output
 def escape_excel_formulas(val):
     if isinstance(val, str) and val.startswith("="):
-        return "'" + val # Maybe find another way? Because this kind of changes the chunk. It adds ' to chunks with = in the beginning.
+        return (
+            "'" + val
+        )  # Maybe find another way? Because this kind of changes the chunk. It adds ' to chunks with = in the beginning.
     return val
+
 
 def save_data_from_result(all_rows, all_columns, csv_name, excel_name):
     df = pd.DataFrame(all_rows, columns=all_columns)
     df.to_csv(csv_name, encoding="utf-8", index=False)
-    
+
     df = df.map(escape_excel_formulas)
     # This is needed since some chunks start with '=' which excel interprets as a formula.
     # The loop below can check for instances of chunks starting with '='
@@ -275,26 +328,52 @@ def save_data_from_result(all_rows, all_columns, csv_name, excel_name):
     #     for j, val in enumerate(row):
     #         if isinstance(val, str) and val.strip().startswith("="):
     #             print(f"Warning: Cell at row {i}, column {j} starts with '=' and may be interpreted as a formula")
-    with pd.ExcelWriter(excel_name) as writer:  
+    with pd.ExcelWriter(excel_name) as writer:
         df.to_excel(writer, sheet_name="Test_Query", index=False)
 
 
 # ----------------Query Functions----------------#
 # -----------------------------------------------#
-# There are 3 different ones. 
+# There are 3 different ones.
 # (query_documents_all_embeddings) is for query with all embeddings,
 # (query_documents_one_embedding) is for a single embedding query,
 # (query_documents_text_input) is for a single text query.
 
+
 def query_documents_all_embeddings(question, n_results=3):
-    all_columns = ["Result_Id", "Correct_File", "Guessed_File", "Filename_Match", "Correct_Pages", "Guessed_Page", "Page_Match", "Distance", "Text_Match_Start_Percent", "Match_Length_Start", "Text_Match_End_Percent", "Match_Length_End", "No_match", "Match_Threshold", "Difficulty", "Category", "Expected_answer", "Question", "Returned_Chunk", "Chunk_Id"]
+    all_columns = [
+        "Result_Id",
+        "Correct_File",
+        "Guessed_File",
+        "Filename_Match",
+        "Correct_Pages",
+        "Guessed_Page",
+        "Page_Match",
+        "Distance",
+        "Text_Match_Start_Percent",
+        "Match_Length_Start",
+        "Text_Match_End_Percent",
+        "Match_Length_End",
+        "No_match",
+        "Match_Threshold",
+        "Difficulty",
+        "Category",
+        "Expected_answer",
+        "Question",
+        "Returned_Chunk",
+        "Chunk_Id",
+    ]
     all_rows = []
     for value in question.values():
-        results = collection.query(query_embeddings=[value["question_embedding"]], n_results=n_results)
-        for idx, document in enumerate(results["documents"][0]): # document here refers to chunks, due to chromadb naming
+        results = collection.query(
+            query_embeddings=[value["question_embedding"]], n_results=n_results
+        )
+        for idx, document in enumerate(
+            results["documents"][0]
+        ):  # document here refers to chunks, due to chromadb naming
             distance = results["distances"][0][idx]
             metadata = results["metadatas"][0][idx]
-            
+
             correct_file = value["files"][0]["file"]
             guessed_file = metadata.get("filename")
             filename_match = guessed_file == correct_file
@@ -306,18 +385,30 @@ def query_documents_all_embeddings(question, n_results=3):
                 page_match = guessed_page in correct_pages
             else:
                 page_match = False
-            
-            match_from_start_bool, match_from_start_float, match_from_start_length = check_shrinking_matches(list(value["answer"].lower()), document, shrink_from_start=False)
-            match_from_end_bool, match_from_end_float, match_from_end_length = check_shrinking_matches(list(value["answer"].lower()), document, shrink_from_start=True)
+
+            match_from_start_bool, match_from_start_float, match_from_start_length = (
+                check_shrinking_matches(
+                    list(value["answer"].lower()), document, shrink_from_start=False
+                )
+            )
+            match_from_end_bool, match_from_end_float, match_from_end_length = (
+                check_shrinking_matches(
+                    list(value["answer"].lower()), document, shrink_from_start=True
+                )
+            )
             # We need to figure out what the thershold is, and how to calculate it. This adds both matches.
             # We could use match length somehow as well?
-            match_threshold = True if (match_from_start_float + match_from_end_float > MATCH_THRESHOLD) else False
-            
+            match_threshold = (
+                True
+                if (match_from_start_float + match_from_end_float > MATCH_THRESHOLD)
+                else False
+            )
+
             text_match_start_value = match_from_start_float
             text_match_end_value = match_from_end_float
             no_match = not (match_from_start_bool or match_from_end_bool)
-            result_id = f"{value["id"]}R{idx + 1}"
-            
+            result_id = f"{value['id']}R{idx + 1}"
+
             row = [
                 result_id,
                 correct_file,
@@ -338,16 +429,18 @@ def query_documents_all_embeddings(question, n_results=3):
                 value["answer"],
                 value["question"],
                 document,
-                results["ids"][0][idx]
+                results["ids"][0][idx],
             ]
             all_rows.append(row)
-            
+
     save_data_from_result(all_rows, all_columns, RESULTS_CSV_NAME, RESULTS_EXCEL_NAME)
-    
+
 
 # For query with one question, using embeddings
 def query_documents_one_embedding(question, n_results=3):
-    results = collection.query(query_embeddings=[question["question_embedding"]], n_results=n_results)
+    results = collection.query(
+        query_embeddings=[question["question_embedding"]], n_results=n_results
+    )
     for idx, document in enumerate(results["documents"][0]):
         distance = results["distances"][0][idx]
         metadata = results["metadatas"][0][idx]  # Include metadata if needed
@@ -356,10 +449,20 @@ def query_documents_one_embedding(question, n_results=3):
         print("-" * 60)
         print("Question: ", question["question"])
         print("Answer expected: ", question["answer"])
-        print("\nFile from result: ", metadata.get("filename"), " | File from toml: ", question["files"][0]["file"])
+        print(
+            "\nFile from result: ",
+            metadata.get("filename"),
+            " | File from toml: ",
+            question["files"][0]["file"],
+        )
         if metadata.get("filename") == question["files"][0]["file"]:
             print("Right File!")
-            print("Pages from result", question["files"][0]["page_numbers"], " | Pages from toml: ", metadata.get("page_number"))
+            print(
+                "Pages from result",
+                question["files"][0]["page_numbers"],
+                " | Pages from toml: ",
+                metadata.get("page_number"),
+            )
             if metadata.get("page_number") in question["files"][0]["page_numbers"]:
                 print("Right Pages!")
             else:
@@ -368,7 +471,9 @@ def query_documents_one_embedding(question, n_results=3):
             print("Wrong File!")
         print("Distance between question and chunk embedding: ", distance)
         print("-" * 30)
-        match_strings(document, question["answer"]) # Does not use the returns, just the prints
+        match_strings(
+            document, question["answer"]
+        )  # Does not use the returns, just the prints
 
 
 # For query with one question, using text
@@ -384,7 +489,7 @@ def query_documents_text_input(question, n_results=3):
         metadata = results["metadatas"][0][idx]  # Include metadata if needed
         print("-" * 60)
         print(
-            f"Found chunk: ID={doc_id}, Page={metadata.get("page_number")}, Distance={distance}"
+            f"Found chunk: ID={doc_id}, Page={metadata.get('page_number')}, Distance={distance}"
         )
         print("-" * 60)
         print(f"Content:\n{document}\n\n---\n")
@@ -422,7 +527,7 @@ def query_documents_text_input(question, n_results=3):
 # --Step 2
 # --This takes all toml files in TOML_DIRECTORY and parses them.
 # --Then it adds a key "question_embedding" with the embedding array of the question as value
-# --It then saves a new file with "embedded_"-prefix, which is a copy of the old toml, 
+# --It then saves a new file with "embedded_"-prefix, which is a copy of the old toml,
 # ----but with the embeddings included in the file.
 # --Important to keep the "embedded_"-prefix, since other functions use that as a filter,
 # ----to choose which file to read.
@@ -440,14 +545,13 @@ def query_documents_text_input(question, n_results=3):
 # --The key for each entry in the dictionary is the question id from the toml files.
 # --This dictionary will be used in queries and to match results
 # --Needs to run if you want to use the embeddings from the toml file,
-# ----and run a query with the functions 
-# ----"query_documents_one_embedding" or 
+# ----and run a query with the functions
+# ----"query_documents_one_embedding" or
 # ----"query_documents_all_questions"
 # --------------------------------------------------------------#
 # -------Get the data from toml files, with embedding-----------#
 # --------------------------------------------------------------#
-# question_dict = get_embedded_questions(TOML_DIRECTORY)
-
+question_dict = get_embedded_questions(TOML_DIRECTORY)
 
 
 # --Step 3.2, Last step for now.
@@ -455,7 +559,7 @@ def query_documents_text_input(question, n_results=3):
 # --The function checks the result of the query, gives distances between question and chunk embedding.
 # --Then we compare the metadata of the chunk with the data in the dictionary.
 # --We check for filename match, page number match and finally text match.
-# --query_documents_one_embedding only checks one embedded question 
+# --query_documents_one_embedding only checks one embedded question
 # ----from the loaded dictionary and prints results.
 # --query_documents_all_embeddings checks all embedded questions
 # ----from the loaded dictionary and saves results in csv and xlsx files.
@@ -464,9 +568,8 @@ def query_documents_text_input(question, n_results=3):
 # --------------------------------------------------------------#
 # -------------Run an embedded query from toml files------------#
 # --------------------------------------------------------------#
-# query_documents_one_embedding(question_dict["PMCSKOLVERKET002"], n_results=RESULTS_PER_QUERY)
+query_documents_one_embedding(question_dict["DC048"], n_results=RESULTS_PER_QUERY)
 # query_documents_all_embeddings(question_dict, n_results=RESULTS_PER_QUERY)
-
 
 
 # --------------------------Not in this project scope--------------------------#
