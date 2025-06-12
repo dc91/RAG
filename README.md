@@ -1,6 +1,6 @@
 This code was written during the night, look out for misstakes!
 ```
-pip install chromadb openai pymupdf4llm tiktoken tomlkit tomli pandas matplotlib seaborn openpyxl
+pip install chromadb openai pymupdf4llm tiktoken tomlkit tomli pandas matplotlib seaborn openpyxl levenshtein tqdm joblib
 ```
 checkSplitting.py checks how the splitting looks in normal text and markdown.
 
