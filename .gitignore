@@ -1,9 +1,8 @@
 /.env
 /.venv
-/extra_scripts
-/doc_storage_norm_all
+/docs_storage_norm_all
 /compare_splits_sorted
 /questions
-/jupyter
 /pdf_data
 /results
+/findPDF.py

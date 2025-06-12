@@ -14,8 +14,8 @@ load_dotenv()
 # -----------------------------------------------#
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 PDF_DIRECTORY = "./pdf_data"
-COLLECTION_NAME = "doc_collection_norm_all"
-PERSIST_DIRECTORY = "doc_storage_norm_all"
+COLLECTION_NAME = "docs_collection_norm_all"
+PERSIST_DIRECTORY = "docs_storage_norm_all"
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
 TOKEN_ENCODER = tiktoken.encoding_for_model(EMBEDDING_MODEL_NAME)
 MAX_TOKENS = 512
@@ -88,15 +88,16 @@ def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=512):
 
         # Majority page number for this chunk (for metadata)
         chunk_pages = token_page_map[start:end]
-        if chunk_pages:
-            most_common_page = max(set(chunk_pages), key=chunk_pages.count)
-        else:
-            most_common_page = None
+        page_list = sorted(set(chunk_pages))
+        # if chunk_pages:
+        #     most_common_page = max(set(chunk_pages), key=chunk_pages.count)
+        # else:
+        #     most_common_page = None
 
         chunk_metadata = {
             "id": f"{filename}_chunk{i + 1}",
             "filename": filename,
-            "page_number": most_common_page,
+            "page_number": ",".join(map(str, page_list)),
             "chunk_index": i + 1,
             "total_chunks": total_chunks,
         }

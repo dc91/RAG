@@ -55,34 +55,6 @@ def plot_match_by_diff(df):
     plt.tight_layout()
     plt.show(block=False)
     
-def plot_matches_compare(df):
-    df["Match_Combo"] = df.apply(match_combo, axis=1)
-    size_map = {
-        "File and Page": "File and Page",
-        "Filename Only": "File Only",
-        "Page Only": "Page Only",
-        "Neither": "Neither"
-    }
-    df["Match_Type"] = df["Match_Combo"].map(size_map)
-    plt.figure(figsize=(12, 8))
-    sns.scatterplot(
-        data=df,
-        x="Text_Match_End_Percent",
-        y="Text_Match_Start_Percent",
-        hue="Match_Threshold",
-        size="Match_Type",
-        sizes=(50, 200),
-        palette={True: "blue", False: "red"},
-        alpha=0.7
-    )
-    plt.title("Text Match Spread")
-    plt.xlabel("Text Match from End (%)")
-    plt.ylabel("Text Match from Start (%)")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show(block=False)
-    
 def plot_match_file_vs_page(df):
     df["Match_Combo"] = df["Filename_Match"].astype(str) + "File_" + df["Page_Match"].astype(str) + "Page"
 
@@ -233,18 +205,65 @@ def plot_match_file_vs_page_by_result2(df):
     plt.tight_layout()
     plt.show(block=False)
     
-df = pd.read_csv("results/norm_queries.csv", sep=",", encoding="utf-8")
+def plot_matches_heatmap_split_with_match_type(df):
+    # Ensure Match_Combo and Match_Type columns are present
+    df["Match_Combo"] = df.apply(match_combo, axis=1)
+    size_map = {
+        "File and Page": 200,
+        "Filename Only": 150,
+        "Page Only": 100,
+        "Neither": 50
+    }
+    color_map = {
+        "File and Page": "pink",
+        "Filename Only": "blue",
+        "Page Only": "yellow",
+        "Neither": "red"
+    }
+    df["Match_Type"] = df["Match_Combo"].map(lambda x: {
+        "File and Page": "File and Page",
+        "Filename Only": "Filename Only",
+        "Page Only": "Page Only",
+        "Neither": "Neither"
+    }[x])
+    df["Point_Size"] = df["Match_Type"].map(size_map)
+    df["Point_Color"] = df["Match_Type"].map(color_map)
+
+    g = sns.FacetGrid(df, col="Match_Threshold", height=6, aspect=1)
+    g.map_dataframe(
+        sns.scatterplot,
+        x="Text_Match_End_Percent",
+        y="Text_Match_Start_Percent",
+        hue="Match_Type",
+        size="Point_Size",
+        sizes=(50, 200),
+        alpha=0.6,
+        palette=color_map,
+        legend="full"
+    )
+    
+    g.set_axis_labels("Text Match from End (%)", "Text Match from Start (%)")
+    g.figure.subplots_adjust(top=0.85)
+    g.figure.suptitle("Match Type Scatter Heatmap by Threshold")
+    g.add_legend(title="Match Type")
+
+    plt.show(block=False)    
+
+
+
+df = pd.read_csv("results/norm_queries_no_tol.csv", sep=",", encoding="utf-8")
+
+plot_acc_by_cat(df)
+plot_matches_heatmap_split(df)
+plot_matches_heatmap_split_with_match_type(df)
+plot_best_result_by_text_match(df)
+plot_threshold_given_page_match(df)
+
+# plot_match_by_diff(df)
 
 plot_accuracy_precision_recall(df)
-plot_acc_by_cat(df)
-plot_match_by_diff(df)
-plot_matches_compare(df)
-plot_match_file_vs_page(df)
-plot_threshold_given_page_match(df)
-plot_best_result_by_text_match(df)
-plot_matches_heatmap_split(df)
 plot_match_file_vs_page_by_result(df)
 plot_match_file_vs_page_by_result2(df)
-
+plot_match_file_vs_page(df)
 
 input("Press Enter to close all plots...") # so the plots don't diasappear after render

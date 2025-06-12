@@ -17,9 +17,9 @@ load_dotenv()
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 TOML_DIRECTORY = "questions/embedded/"
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
-COLLECTION_NAME = "doc_collection_norm_all"
-PERSIST_DIRECTORY = "doc_storage_norm_all"
-MATCH_THRESHOLD = 50
+COLLECTION_NAME = "docs_collection_norm_all"
+PERSIST_DIRECTORY = "docs_storage_norm_all"
+MATCH_THRESHOLD = 30
 MIN_ANS_LENGTH = 3
 RESULTS_PER_QUERY = 5
 TOLERANCE = 1
@@ -163,14 +163,15 @@ def query_documents_all_embeddings(question, n_results=3):
             distance_val = results["distances"][0][idx]
             metadata = results["metadatas"][0][idx]
 
-            correct_file = value["files"][0]["file"]
-            guessed_file = metadata.get("filename")
+            correct_file = value["files"][0]["file"].lower()
+            guessed_file = metadata.get("filename").lower() # since toml parser might change case
             filename_match = guessed_file == correct_file
 
             correct_pages = value["files"][0]["page_numbers"]
             guessed_page = metadata.get("page_number")
+            guessed_page_list = list(map(int, guessed_page.split(",")))
             # Don't check for page matches if wrong file
-            page_match = guessed_page in correct_pages if filename_match else False
+            page_match = any(page in correct_pages for page in guessed_page_list) if filename_match else False
 
             (match_from_start_bool, match_from_start_float,
                 match_from_start_length, match_from_end_bool,
@@ -221,13 +222,14 @@ def process_question(value, n_results):
         distance_val = results["distances"][0][idx]
         metadata = results["metadatas"][0][idx]
 
-        correct_file = value["files"][0]["file"]
-        guessed_file = metadata.get("filename")
+        correct_file = value["files"][0]["file"].lower()
+        guessed_file = metadata.get("filename").lower()
         filename_match = guessed_file == correct_file
 
         correct_pages = value["files"][0]["page_numbers"]
         guessed_page = metadata.get("page_number")
-        page_match = guessed_page in correct_pages if filename_match else False
+        guessed_page_list = list(map(int, guessed_page.split(",")))
+        page_match = any(page in correct_pages for page in guessed_page_list) if filename_match else False
 
         (
             match_from_start_bool,
@@ -279,7 +281,7 @@ def query_documents_all_embeddings_parallel(question_dict, n_results=3):
     all_rows = [row for result in results for row in result]
     save_data_from_result(all_rows, all_columns, RESULTS_CSV_NAME, RESULTS_EXCEL_NAME)
 
-if __name__ == "__main__":
+if __name__ == "__main__": #Needed for multiprocessing to work correctly
     # --------------------------------------------------------------#
     # -------Get the data from toml files, with embedding-----------#
     # --------------------------------------------------------------#

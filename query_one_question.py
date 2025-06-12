@@ -14,11 +14,11 @@ load_dotenv()
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 TOML_DIRECTORY = "questions/embedded/"
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
-COLLECTION_NAME = "doc_collection_norm_all"
-PERSIST_DIRECTORY = "doc_storage_norm_all"
+COLLECTION_NAME = "docs_collection_norm_all"
+PERSIST_DIRECTORY = "docs_storage_norm_all"
 MATCH_THRESHOLD = 50
 RESULTS_PER_QUERY = 5
-TOLERANCE = 1
+TOLERANCE = 0
 
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
     api_key=OPENAI_KEY, model_name=EMBEDDING_MODEL_NAME
@@ -129,7 +129,9 @@ def query_documents_one_embedding(question, n_results=3):
                 " | Pages from toml: ",
                 metadata.get("page_number"),
             )
-            if metadata.get("page_number") in question["files"][0]["page_numbers"]:
+            guessed_page_list = list(map(int, metadata.get("page_number").split(",")))
+            page_match = any(page in question["files"][0]["page_numbers"] for page in guessed_page_list) if metadata.get("filename") == question["files"][0]["file"] else False
+            if page_match:
                 print("Right Pages!")
             else:
                 print("Wrong Pages!")
@@ -150,4 +152,4 @@ question_dict = get_embedded_questions(TOML_DIRECTORY)
 # --------------------------------------------------------------#
 # -------------Run an embedded query from toml files------------#
 # --------------------------------------------------------------#
-query_documents_one_embedding(question_dict["DC222"], n_results=RESULTS_PER_QUERY)
+query_documents_one_embedding(question_dict["PAV021"], n_results=RESULTS_PER_QUERY)
