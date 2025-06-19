@@ -3,7 +3,7 @@ import tomli
 from Levenshtein import distance
 from Levenshtein import ratio
 from config import (
-    TOML_DIRECTORY,
+    TOML_DIRECTORY_EMBEDDED,
     RESULTS_PER_QUERY,
     TOLERANCE,
     get_collection
@@ -129,7 +129,7 @@ def query_documents_one_embedding(question, n_results=3):
 # --------------------------------------------------------------#
 # -------Get the data from toml files, with embedding-----------#
 # --------------------------------------------------------------#
-question_dict = get_embedded_questions(TOML_DIRECTORY)
+question_dict = get_embedded_questions(TOML_DIRECTORY_EMBEDDED)
 
 # --------------------------------------------------------------#
 # -------------Run an embedded query from toml files------------#

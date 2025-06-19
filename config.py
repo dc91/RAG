@@ -9,19 +9,20 @@ load_dotenv()
 
 # ------------Directories------------#
 PDF_DIRECTORY = "pdf_data"
-TOML_DIRECTORY = "questions/embedded"
+TOML_DIRECTORY_CLEANED = "questions/cleaned"
+TOML_DIRECTORY_EMBEDDED = "questions/embedded"
 OUTPUT_DIRECTORY_COMPARE_SPLITS = "compare_splits_from_parser"
 RESULTS_DIRECTORY = "results"
 
 # ----OpenAI and ChromaDB Configs----#
-VERSION_NAME = "BASELINE_384_Chunk_25_Overlap"
+VERSION_NAME = "BASELINE"
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 COLLECTION_NAME = f"docs_{VERSION_NAME}_collection"
 PERSIST_DIRECTORY = f"docs_{VERSION_NAME}_storage"
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
 TOKEN_ENCODER = tiktoken.encoding_for_model(EMBEDDING_MODEL_NAME)
-MAX_TOKENS = 384
-OVERLAP = 25
+MAX_TOKENS = 512
+OVERLAP = 0
 
 def get_client():
     return OpenAI(api_key=OPENAI_KEY)
@@ -40,7 +41,7 @@ def get_collection():
 MATCH_THRESHOLD = 30
 MIN_ANS_LENGTH = 3
 RESULTS_PER_QUERY = 5
-TOLERANCE = 1
+TOLERANCE = 0
 MULTIPROCESSING = True if TOLERANCE > 0 else False
 
 def get_results_filenames():

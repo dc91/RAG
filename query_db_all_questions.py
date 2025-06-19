@@ -6,7 +6,7 @@ from Levenshtein import ratio
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from config import (
-    TOML_DIRECTORY,
+    TOML_DIRECTORY_EMBEDDED,
     RESULTS_PER_QUERY,
     TOLERANCE,
     MATCH_THRESHOLD,
@@ -257,7 +257,7 @@ if __name__ == "__main__": #Needed for multiprocessing to work correctly
     # --------------------------------------------------------------#
     # -------Get the data from toml files, with embedding-----------#
     # --------------------------------------------------------------#
-    question_dict = get_embedded_questions(TOML_DIRECTORY)
+    question_dict = get_embedded_questions(TOML_DIRECTORY_EMBEDDED)
 
     # --------------------------------------------------------------#
     # -------------Run an embedded query from toml files------------#
