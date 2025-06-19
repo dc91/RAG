@@ -1,6 +1,8 @@
 import fitz  # PyMuPDF
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
 
 from config import (
     PDF_DIRECTORY,
@@ -96,35 +98,46 @@ def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERLAP):
 # -----------------------------------------------#
 # -----Embedd PDFs and Insert to ChromaDB--------#
 # -----------------------------------------------#
-def process_pdfs_and_insert(directory):
+def embed_and_insert(chunk):
+    chunk_id = chunk["metadata"]["id"]
+    try:
+        # print(f"[Thread] Embedding: {chunk_id}")
+        embedding = client.embeddings.create(
+            input=chunk["text"], model=EMBEDDING_MODEL_NAME
+        ).data[0].embedding
+
+        # print(f"[Thread] Inserting: {chunk_id}")
+        collection.upsert(
+            ids=[chunk_id],
+            documents=[chunk["text"]],
+            embeddings=[embedding],
+            metadatas=[chunk["metadata"]],
+        )
+    except Exception as e:
+        print(f"[Error] Failed for {chunk_id}: {e}")
+
+def get_max_workers(factor=1.5, fallback=4):
+    try:
+        return max(1, int(multiprocessing.cpu_count() * factor))
+    except NotImplementedError:
+        return fallback
+
+def process_pdfs_and_insert(directory, max_workers=None):
+    if max_workers is None:
+        max_workers = get_max_workers()
+
     for filename in os.listdir(directory):
         if filename.endswith(".pdf"):
-            print(f"Processing: {filename}")
             pdf_path = os.path.join(directory, filename)
+            print(f"\n📄 Processing file: {filename}")
             chunks = chunk_pdf_by_tokens(pdf_path)
 
-            for chunk in chunks:
-                chunk_id = chunk["metadata"]["id"]
-                chunk_text = chunk["text"]
-                # Test print
-                # print("Chunk", chunk_id, ": ", chunk_text)
-                # Get embedding
-                print(f"Generating embedding for {chunk_id}")
-                embedding = (
-                    client.embeddings.create(
-                        input=chunk_text, model=EMBEDDING_MODEL_NAME
-                    )
-                    .data[0]
-                    .embedding
-                )
-                # Insert into ChromaDB, upsert to not upload existing files
-                print(f"Inserting chunk {chunk_id} into ChromaDB")
-                collection.upsert(
-                    ids=[chunk_id],
-                    documents=[chunk_text],
-                    embeddings=[embedding],
-                    metadatas=[chunk["metadata"]],
-                )
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(embed_and_insert, chunk) for chunk in chunks]
+                for future in as_completed(futures):
+                    future.result()
+
+            print(f"✅ Finished processing: {filename}")
 
 
 # --This takes all pdf files in PDF_DIRECTORY and parses them.

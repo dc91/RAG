@@ -9,3 +9,5 @@
 /txt_data
 /docs*
 /VERSIONS
+/__pycache__
+config.py
