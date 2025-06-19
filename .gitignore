@@ -1,10 +1,11 @@
 /.env
 /.venv
 /compare*
-/questions
-/pdf_data
+/questions/raw
+/questions/questionsOG
+# /pdf_data
 /temp_pdf
-/results
+# /results
 /findPDF.py
 /txt_data
 /docs*
