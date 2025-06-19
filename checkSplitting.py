@@ -8,9 +8,10 @@ import os
 import pymupdf4llm
 import pathlib
 import re
-
-FOLDER_PATH = "temp_storage"
-OUTPUT_BASE = "./compare_splits_sorted"
+from config import (
+    FOLDER_PATH,
+    OUTPUT_BASE,
+)
 
 def normalize_text(input_text):
     # Remove split words at the end of lines
