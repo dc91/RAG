@@ -5,17 +5,14 @@ from tomlkit import (
     dumps,
 )
 from dotenv import load_dotenv
+from config import (
+    OPENAI_KEY,
+    TOML_DIRECTORY,
+    EMBEDDING_MODEL_NAME,
+)
 load_dotenv()
 
-
-# -----------------------------------------------#
-# -------------------Config----------------------#
-# -----------------------------------------------#
-EMBEDDING_MODEL_NAME = "text-embedding-3-small"
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-TOML_DIRECTORY = "questions/cleaned/"
 client = OpenAI(api_key=OPENAI_KEY)
-
 
 # -----------------------------------------------#
 # ---------------Embedding Question--------------#

@@ -6,19 +6,18 @@ import chromadb
 from openai import OpenAI
 from chromadb.utils import embedding_functions
 import re
+from config import (
+    OPENAI_KEY,
+    PDF_DIRECTORY,
+    COLLECTION_NAME,
+    PERSIST_DIRECTORY,
+    EMBEDDING_MODEL_NAME,
+    TOKEN_ENCODER,
+    MAX_TOKENS,
+)
 
 load_dotenv()
 
-# -----------------------------------------------#
-# -------------------Config----------------------#
-# -----------------------------------------------#
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-PDF_DIRECTORY = "./pdf_data"
-COLLECTION_NAME = "docs_collection_norm_all"
-PERSIST_DIRECTORY = "docs_storage_norm_all"
-EMBEDDING_MODEL_NAME = "text-embedding-3-small"
-TOKEN_ENCODER = tiktoken.encoding_for_model(EMBEDDING_MODEL_NAME)
-MAX_TOKENS = 512
 # -----------------------------------------------#
 # ------------ChromaDB and OpenAI Config---------#
 # -----------------------------------------------#

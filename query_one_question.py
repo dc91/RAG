@@ -6,19 +6,19 @@ import tomli
 from Levenshtein import distance
 from Levenshtein import ratio
 
+from config import (
+    OPENAI_KEY,
+    TOML_DIRECTORY,
+    EMBEDDING_MODEL_NAME,
+    COLLECTION_NAME,
+    PERSIST_DIRECTORY,
+    MATCH_THRESHOLD,
+    RESULTS_PER_QUERY,
+    TOLERANCE,
+)
+
 load_dotenv()
 
-# -----------------------------------------------#
-# -------------------Config----------------------#
-# -----------------------------------------------#
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-TOML_DIRECTORY = "questions/embedded/"
-EMBEDDING_MODEL_NAME = "text-embedding-3-small"
-COLLECTION_NAME = "docs_collection_norm_all"
-PERSIST_DIRECTORY = "docs_storage_norm_all"
-MATCH_THRESHOLD = 50
-RESULTS_PER_QUERY = 5
-TOLERANCE = 0
 
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
     api_key=OPENAI_KEY, model_name=EMBEDDING_MODEL_NAME

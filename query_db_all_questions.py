@@ -9,27 +9,22 @@ from Levenshtein import ratio
 from tqdm import tqdm
 from joblib import Parallel, delayed
 
-load_dotenv()
+from config import (
+    OPENAI_KEY,
+    TOML_DIRECTORY,
+    EMBEDDING_MODEL_NAME,
+    COLLECTION_NAME,
+    PERSIST_DIRECTORY,
+    MATCH_THRESHOLD,
+    MIN_ANS_LENGTH,
+    RESULTS_PER_QUERY,
+    TOLERANCE,
+    MULTIPROCESSING,
+    RESULTS_CSV_NAME,
+    RESULTS_EXCEL_NAME,
+)
 
-# -----------------------------------------------#
-# -------------------Config----------------------#
-# -----------------------------------------------#
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-TOML_DIRECTORY = "questions/embedded/"
-EMBEDDING_MODEL_NAME = "text-embedding-3-small"
-COLLECTION_NAME = "docs_collection_norm_all"
-PERSIST_DIRECTORY = "docs_storage_norm_all"
-MATCH_THRESHOLD = 30
-MIN_ANS_LENGTH = 3
-RESULTS_PER_QUERY = 5
-TOLERANCE = 1
-MULTIPROCESSING = True if TOLERANCE > 0 else False
-if MULTIPROCESSING:
-    RESULTS_CSV_NAME = f"results/norm_queries_with_tol{TOLERANCE}.csv"
-    RESULTS_EXCEL_NAME = f"results/norm_queries_excel_tol{TOLERANCE}.xlsx"
-else:
-    RESULTS_CSV_NAME = "results/norm_queries_no_tol.csv"
-    RESULTS_EXCEL_NAME = "results/norm_queries_excel_no_tol.xlsx"
+load_dotenv()
 
 
 def get_collection():
