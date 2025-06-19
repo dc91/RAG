@@ -15,14 +15,20 @@ OUTPUT_DIRECTORY_COMPARE_SPLITS = "compare_splits_from_parser"
 RESULTS_DIRECTORY = "results"
 
 # ----OpenAI and ChromaDB Configs----#
-VERSION_NAME = "BASELINE"
+MAX_TOKENS = 384
+OVERLAP = 5
+
+if OVERLAP > 0:
+    VERSION_NAME = f"BASELINE_{MAX_TOKENS}_Chunk_{OVERLAP}_Overlap"
+else:
+    VERSION_NAME = f"BASELINE_{MAX_TOKENS}_Chunk"
+    
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 COLLECTION_NAME = f"docs_{VERSION_NAME}_collection"
 PERSIST_DIRECTORY = f"docs_{VERSION_NAME}_storage"
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
 TOKEN_ENCODER = tiktoken.encoding_for_model(EMBEDDING_MODEL_NAME)
-MAX_TOKENS = 512
-OVERLAP = 0
+
 
 def get_client():
     return OpenAI(api_key=OPENAI_KEY)
@@ -45,6 +51,7 @@ TOLERANCE = 0
 MULTIPROCESSING = True if TOLERANCE > 0 else False
 
 def get_results_filenames():
+    os.makedirs(RESULTS_DIRECTORY, exist_ok=True)
     if MULTIPROCESSING:
         RESULTS_CSV_NAME = f"{RESULTS_DIRECTORY}/{VERSION_NAME}{TOLERANCE}_tol.csv"
         RESULTS_EXCEL_NAME = f"{RESULTS_DIRECTORY}/{VERSION_NAME}{TOLERANCE}_tol.xlsx"
