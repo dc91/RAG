@@ -3,14 +3,18 @@
 # When converting to markdown, the images are saved in a folder with the same name as the pdf file.
 
 import fitz  # PyMuPDF
-import tiktoken
 import os
 import pymupdf4llm
 import pathlib
 import re
 
-FOLDER_PATH = "temp_storage"
-OUTPUT_BASE = "./compare_splits_sorted"
+from config import (
+    PDF_DIRECTORY,
+    TOKEN_ENCODER,
+    MAX_TOKENS,
+    OVERLAP,
+    OUTPUT_DIRECTORY_COMPARE_SPLITS
+)
 
 def normalize_text(input_text):
     # Remove split words at the end of lines
@@ -22,8 +26,8 @@ def normalize_text(input_text):
     
     return normalized
 
-def chunk_pdf_by_tokens(pdf_path, model="text-embedding-3-small", max_tokens=512):
-    encoding = tiktoken.encoding_for_model(model)
+def chunk_pdf_by_tokens(pdf_path, model="text-embedding-3-small", MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERLAP):
+    # encoding = tiktoken.encoding_for_model(model)
 
     doc = fitz.open(pdf_path)
     chunks = []
@@ -41,43 +45,45 @@ def chunk_pdf_by_tokens(pdf_path, model="text-embedding-3-small", max_tokens=512
     all_tokens = []
     token_page_map = []  # Keeps track of which page each token came from
     for page_number, page_text in text_and_pagenumber:
-        tokens = encoding.encode(page_text)
+        tokens = TOKEN_ENCODER.encode(page_text)
         all_tokens.extend(tokens)
         token_page_map.extend([page_number] * len(tokens))
 
-    # Split into chunks of max_tokens
-    total_chunks = (len(all_tokens) + max_tokens - 1) // max_tokens
-
-    for i in range(total_chunks):
-        start = i * max_tokens
-        end = start + max_tokens
+    step = MAX_TOKENS - OVERLAP
+    total_tokens = len(all_tokens)
+    i = 0
+    chunk_index = 1
+    
+    while i < total_tokens:
+        start = i
+        end = min(i + MAX_TOKENS, total_tokens)
         token_chunk = all_tokens[start:end]
-        chunk_text = encoding.decode(token_chunk)
-
-        # Majority page number for this chunk (for metadata)
+        chunk_text = TOKEN_ENCODER.decode(token_chunk)
         chunk_pages = token_page_map[start:end]
-        if chunk_pages:
-            most_common_page = max(set(chunk_pages), key=chunk_pages.count)
-        else:
-            most_common_page = None
-
+        page_list = sorted(set(chunk_pages))
         chunk_metadata = {
-            "id": f"{filename}_chunk{i + 1}",
+            "id": f"{filename}_chunk{chunk_index}",
             "filename": filename,
-            "page_number": most_common_page,
-            "chunk_index": i + 1,
-            "total_chunks": total_chunks,
+            "page_number": ",".join(map(str, page_list)),
+            "chunk_index": chunk_index,
         }
 
         chunks.append({"text": chunk_text, "metadata": chunk_metadata})
-
+        i += step
+        chunk_index += 1
+        
+    total_chunks = len(chunks)
+    for chunk in chunks:
+        chunk["metadata"]["total_chunks"] = total_chunks
+    
+    #
     return chunks
 
 
-for filename in os.listdir(FOLDER_PATH):
+for filename in os.listdir(PDF_DIRECTORY):
     if filename.endswith(".pdf"):
         filename_s = filename[:-4]  # Remove '.pdf'
-        pdf_path = os.path.join(FOLDER_PATH, filename)
+        pdf_path = os.path.join(PDF_DIRECTORY, filename)
         chunks = chunk_pdf_by_tokens(pdf_path)
         
         # Print the first two chunks for verification
@@ -87,7 +93,7 @@ for filename in os.listdir(FOLDER_PATH):
         #     print("=" * 60)
         #     print(chunk["text"])
 
-        out_dir = os.path.join(OUTPUT_BASE, filename_s)
+        out_dir = os.path.join(OUTPUT_DIRECTORY_COMPARE_SPLITS, filename_s)
         os.makedirs(out_dir, exist_ok=True)
         file_path_txt = os.path.join(out_dir, "splitToText.txt")
         file_path_md = os.path.join(out_dir, "splitToMd.md")
@@ -100,9 +106,9 @@ for filename in os.listdir(FOLDER_PATH):
                 f.write(chunk["text"] + "\n\n")
 
         md_text = pymupdf4llm.to_markdown(
-            f"./{FOLDER_PATH}/{filename}",
+            f"./{PDF_DIRECTORY}/{filename}",
             write_images=True,
             filename=f"{filename_s}",
-            image_path=f"{OUTPUT_BASE}/{filename_s}/",
+            image_path=f"{OUTPUT_DIRECTORY_COMPARE_SPLITS}/{filename_s}/",
         )
         pathlib.Path(file_path_md).write_bytes(md_text.encode())

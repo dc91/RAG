@@ -1,51 +1,23 @@
 import os
-import chromadb
 import pandas as pd
-from chromadb.utils import embedding_functions
-from dotenv import load_dotenv
 import tomli
 from Levenshtein import distance
 from Levenshtein import ratio
 from tqdm import tqdm
 from joblib import Parallel, delayed
-
-load_dotenv()
-
-# -----------------------------------------------#
-# -------------------Config----------------------#
-# -----------------------------------------------#
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-TOML_DIRECTORY = "questions/embedded/"
-EMBEDDING_MODEL_NAME = "text-embedding-3-small"
-COLLECTION_NAME = "docs_collection_norm_all"
-PERSIST_DIRECTORY = "docs_storage_norm_all"
-MATCH_THRESHOLD = 30
-MIN_ANS_LENGTH = 3
-RESULTS_PER_QUERY = 5
-TOLERANCE = 1
-MULTIPROCESSING = True if TOLERANCE > 0 else False
-if MULTIPROCESSING:
-    RESULTS_CSV_NAME = f"results/norm_queries_with_tol{TOLERANCE}.csv"
-    RESULTS_EXCEL_NAME = f"results/norm_queries_excel_tol{TOLERANCE}.xlsx"
-else:
-    RESULTS_CSV_NAME = "results/norm_queries_no_tol.csv"
-    RESULTS_EXCEL_NAME = "results/norm_queries_excel_no_tol.xlsx"
-
-
-def get_collection():
-    openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-        api_key=OPENAI_KEY, model_name=EMBEDDING_MODEL_NAME
-    )
-    chroma_client = chromadb.PersistentClient(path=PERSIST_DIRECTORY)
-    return chroma_client.get_or_create_collection(
-        name=COLLECTION_NAME, embedding_function=openai_ef
-    )
-
-
-openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-    api_key=OPENAI_KEY, model_name=EMBEDDING_MODEL_NAME
+from config import (
+    TOML_DIRECTORY,
+    RESULTS_PER_QUERY,
+    TOLERANCE,
+    MATCH_THRESHOLD,
+    MIN_ANS_LENGTH,
+    MULTIPROCESSING,
+    get_collection,
+    get_results_filenames
 )
-chroma_client = chromadb.PersistentClient(path=PERSIST_DIRECTORY)
+
+# load_dotenv()
+RESULTS_CSV_NAME, RESULTS_EXCEL_NAME = get_results_filenames()
 collection = get_collection()
 
 
@@ -213,7 +185,7 @@ def query_documents_all_embeddings(question, n_results=3):
 
 # Same as above but for parallel processing
 def process_question(value, n_results):
-    collection = get_collection()
+    collection = get_collection() # Slow to load collection each time, but needed for multiprocessing to work right now.
     results = collection.query(
         query_embeddings=[value["question_embedding"]], n_results=n_results
     )

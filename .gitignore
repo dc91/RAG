@@ -1,9 +1,11 @@
 /.env
 /.venv
-/docs_storage_norm_all
-/compare_splits_sorted
+/compare*
 /questions
 /pdf_data
+/temp_pdf
 /results
 /findPDF.py
 /txt_data
+/docs*
+/VERSIONS

@@ -1,33 +1,15 @@
 import os
-import chromadb
-from chromadb.utils import embedding_functions
-from dotenv import load_dotenv
 import tomli
 from Levenshtein import distance
 from Levenshtein import ratio
-
-load_dotenv()
-
-# -----------------------------------------------#
-# -------------------Config----------------------#
-# -----------------------------------------------#
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-TOML_DIRECTORY = "questions/embedded/"
-EMBEDDING_MODEL_NAME = "text-embedding-3-small"
-COLLECTION_NAME = "docs_collection_norm_all"
-PERSIST_DIRECTORY = "docs_storage_norm_all"
-MATCH_THRESHOLD = 50
-RESULTS_PER_QUERY = 5
-TOLERANCE = 0
-
-openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-    api_key=OPENAI_KEY, model_name=EMBEDDING_MODEL_NAME
-)
-chroma_client = chromadb.PersistentClient(path=PERSIST_DIRECTORY)
-collection = chroma_client.get_or_create_collection(
-    name=COLLECTION_NAME, embedding_function=openai_ef
+from config import (
+    TOML_DIRECTORY,
+    RESULTS_PER_QUERY,
+    TOLERANCE,
+    get_collection
 )
 
+collection = get_collection()
 
 # -----------------------------------------------#
 # ---------------Helping functions---------------#
@@ -152,4 +134,4 @@ question_dict = get_embedded_questions(TOML_DIRECTORY)
 # --------------------------------------------------------------#
 # -------------Run an embedded query from toml files------------#
 # --------------------------------------------------------------#
-query_documents_one_embedding(question_dict["PAV021"], n_results=RESULTS_PER_QUERY)
+query_documents_one_embedding(question_dict["DC021"], n_results=RESULTS_PER_QUERY)

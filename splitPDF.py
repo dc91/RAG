@@ -103,7 +103,7 @@ def parse_document(pdf_path):
 # -----------------------------------------------#
 # -------------Tokenize and Chunk up-------------#
 # -----------------------------------------------#
-def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=512):
+def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=512, OVERLAP=0):
     filename = os.path.basename(pdf_path)
     text_and_pagenumber = parse_document(pdf_path)  # List [(page_number, page_text)]
     chunks = []
@@ -114,33 +114,34 @@ def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=512):
         all_tokens.extend(tokens)
         token_page_map.extend([page_number] * len(tokens))
 
-    # Split into chunks of MAX_TOKENS
-    total_chunks = (len(all_tokens) + MAX_TOKENS - 1) // MAX_TOKENS
-
-    for i in range(total_chunks):
-        start = i * MAX_TOKENS
-        end = start + MAX_TOKENS
+    step = MAX_TOKENS - OVERLAP
+    total_tokens = len(all_tokens)
+    i = 0
+    chunk_index = 1
+    
+    while i < total_tokens:
+        start = i
+        end = min(i + MAX_TOKENS, total_tokens)
         token_chunk = all_tokens[start:end]
         chunk_text = TOKEN_ENCODER.decode(token_chunk)
-
-        # Majority page number for this chunk (for metadata)
         chunk_pages = token_page_map[start:end]
-        if chunk_pages:
-            most_common_page = max(set(chunk_pages), key=chunk_pages.count)
-        else:
-            most_common_page = None
-
+        page_list = sorted(set(chunk_pages))
         chunk_metadata = {
-            "id": f"{filename}_chunk{i + 1}",
+            "id": f"{filename}_chunk{chunk_index}",
             "filename": filename,
-            "page_number": most_common_page,
-            "chunk_index": i + 1,
-            "total_chunks": total_chunks,
+            "page_number": ",".join(map(str, page_list)),
+            "chunk_index": chunk_index,
         }
 
         chunks.append({"text": chunk_text, "metadata": chunk_metadata})
-        # Test print
-        # print("Chunk", i, ": ", chunk_text)
+        i += step
+        chunk_index += 1
+        
+    total_chunks = len(chunks)
+    for chunk in chunks:
+        chunk["metadata"]["total_chunks"] = total_chunks
+    
+    #
     return chunks
 
 
