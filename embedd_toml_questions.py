@@ -1,3 +1,10 @@
+# --This takes all toml files in TOML_DIRECTORY_CLEANED and parses them.
+# --Then it adds a key-value pair "question_embedding" = [embedding array of the question].
+# --It then saves a new file in the directory TOML_DIRECTORY_EMBEDDED. The file will have an "embedded_"-prefix, 
+# ----which is a copy of the old toml, but with the embeddings included in the file.
+# --Important to keep the "embedded_"-prefix, since other functions use that as a filter,
+# ----to choose which file to read.
+
 import multiprocessing
 import os
 from tomlkit import (
@@ -42,14 +49,9 @@ def add_embeddings_to_toml(toml_dir, max_workers=None):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(process_toml_file, f) for f in toml_files]
         for future in as_completed(futures):
-            future.result()  # Will raise error if anything failed
+            future.result()
 
-# --This takes all toml files in TOML_DIRECTORY_CLEANED and parses them.
-# --Then it adds a key "question_embedding" with the embedding array of the question as value.
-# --It then saves a new file. The file will have an "embedded_"-prefix, 
-# ----which is a copy of the old toml, but with the embeddings included in the file.
-# --Important to keep the "embedded_"-prefix, since other functions use that as a filter,
-# ----to choose which file to read.
+
 # --------------------------------------------------------------#
 # -------Write new toml files with embeddings included----------#
 # --------------------------------------------------------------#

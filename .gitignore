@@ -8,6 +8,8 @@
 # /results
 /findPDF.py
 /txt_data
+/md_data
+/.vscode
 /docs*
 /VERSIONS
 /__pycache__

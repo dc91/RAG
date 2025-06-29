@@ -1,3 +1,9 @@
+# --This script takes all pdf files in PDF_DIRECTORY (default=pdf_data) and parses them.
+# --It also tokenizes, Chunks up text, creates embeddings.
+# --Then it inserts the embeddings to chromadb, with metadata.
+# --Only nedds to be run if you want to add documents to the db.
+# --Check config.py, before running, to make sure you have the right settings for your case.
+
 import fitz  # PyMuPDF
 import os
 import re
@@ -14,8 +20,8 @@ from config import (
     get_client
 )
 
-collection = get_collection()
-client = get_client()
+collection = get_collection() # set up db
+client = get_client() # OpenAI client for embeddings
 
 
 # -----------------------------------------------#
@@ -36,16 +42,13 @@ def parse_document(pdf_path):
     text_and_pagenumber = []  # List [(page_number, page_text)]
 
     for i, page in enumerate(doc):
-        text = page.get_text(sort=True)
+        text = page.get_text(sort=True) # sort helps keep the right reading order in the page
         if text.strip():  # Skip empty pages
             norm_text = normalize_text(text)
             text_and_pagenumber.append((i + 1, norm_text + " "))
     doc.close()
-    # Test print
-    # print(text_and_pagenumber)
     return text_and_pagenumber
-# Test call
-# parse_document(pdf_path = os.path.join(PDF_DIRECTORY, "12_BERÄTTELSER_OM_SKAM.pdf"))
+
 
 
 # -----------------------------------------------#
@@ -62,11 +65,12 @@ def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERLAP):
         all_tokens.extend(tokens)
         token_page_map.extend([page_number] * len(tokens))
 
+    # Set up loop and chunk boundaries
     step = MAX_TOKENS - OVERLAP
     total_tokens = len(all_tokens)
     i = 0
     chunk_index = 1
-    
+    # Loop through all tokens and store chunk with metadata in the returned variable: chunks
     while i < total_tokens:
         start = i
         end = min(i + MAX_TOKENS, total_tokens)
@@ -78,7 +82,7 @@ def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERLAP):
             "id": f"{filename}_chunk{chunk_index}",
             "filename": filename,
             "page_number": ",".join(map(str, page_list)),
-            "chunk_index": chunk_index,
+            "chunk_index": chunk_index
         }
 
         chunks.append({"text": chunk_text, "metadata": chunk_metadata})
@@ -88,25 +92,27 @@ def chunk_pdf_by_tokens(pdf_path, MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERLAP):
     total_chunks = len(chunks)
     for chunk in chunks:
         chunk["metadata"]["total_chunks"] = total_chunks
-    
-    #
+
     return chunks
-# Test call
-# chunk_pdf_by_tokens(os.path.join(PDF_DIRECTORY, "12_BERÄTTELSER_OM_SKAM.pdf"))
 
 
 # -----------------------------------------------#
 # -----Embedd PDFs and Insert to ChromaDB--------#
 # -----------------------------------------------#
+def get_max_workers(factor=1.5, fallback=4):
+    try:
+        return max(1, int(multiprocessing.cpu_count() * factor))
+    except NotImplementedError:
+        return fallback
+
+# Get embeddings of chunks from client, store with metadata in db
 def embed_and_insert(chunk):
     chunk_id = chunk["metadata"]["id"]
     try:
-        # print(f"[Thread] Embedding: {chunk_id}")
         embedding = client.embeddings.create(
             input=chunk["text"], model=EMBEDDING_MODEL_NAME
         ).data[0].embedding
 
-        # print(f"[Thread] Inserting: {chunk_id}")
         collection.upsert(
             ids=[chunk_id],
             documents=[chunk["text"]],
@@ -115,13 +121,8 @@ def embed_and_insert(chunk):
         )
     except Exception as e:
         print(f"[Error] Failed for {chunk_id}: {e}")
-
-def get_max_workers(factor=1.5, fallback=4):
-    try:
-        return max(1, int(multiprocessing.cpu_count() * factor))
-    except NotImplementedError:
-        return fallback
-
+        
+# Get all chunks and call the embed_and_insert(chunk) function for all of them. With multiprocessing
 def process_pdfs_and_insert(directory, max_workers=None):
     if max_workers is None:
         max_workers = get_max_workers()
@@ -140,10 +141,6 @@ def process_pdfs_and_insert(directory, max_workers=None):
             print(f"✅ Finished processing: {filename}")
 
 
-# --This takes all pdf files in PDF_DIRECTORY and parses them.
-# --It also tokenizes, Chunks up text, creates embeddings.
-# --Then it inserts the embeddings to chromadb, with metadata.
-# --Only nedds to be run if you want to add documents to db.
 # --------------------------------------------------------------------#
 # --Parse, Tokenize, Chunk up, Embedd PDFs and insert into database---#
 # --------------------------------------------------------------------#

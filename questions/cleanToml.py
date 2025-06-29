@@ -4,7 +4,7 @@ from glob import glob
 from tomlkit import parse, dumps
 
 # Directories
-input_dir = "questions/raw/"
+input_dir = "questions/raw"
 output_dir = "questions/cleaned/"
 
 # Ensure output directory exists

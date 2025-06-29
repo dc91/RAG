@@ -16,7 +16,6 @@ from config import (
     get_results_filenames
 )
 
-# load_dotenv()
 RESULTS_CSV_NAME, RESULTS_EXCEL_NAME = get_results_filenames()
 collection = get_collection()
 
@@ -42,8 +41,8 @@ def get_embedded_questions(toml_dir):
 
 # Checks the saved answer with the fetched chunk
 # If no match, it shrinks by one character and tries again.
-# until characters run out or match is found.
-# can change range of loop to not shrink until the very last character
+# until characters run out or match is found. Forwards and backwards is possible.
+# You can change range of loop to not shrink until the very last character
 # since that is a bad match anyway.
 def check_shrinking_matches_no_tolerance(text_list, chunk, shrink_from_start=False):
     chunk = chunk.lower()
@@ -74,6 +73,7 @@ def check_shrinking_matches_with_tolerance(text_list, chunk, shrink_from_start=F
             dist = distance(substring, window, score_cutoff=1, score_hint=0)
             ratios = ratio(substring, window)
             # Check if the distance is within the allowed tolerance
+            # ratios limit tries to block very short answers that have changed too many characters. (needs optimizing and testing)
             if dist <= TOLERANCE and ratios >= 0.92:
                 percent_of_answer_kept = 100.0 * len(current) / text_len
                 return True, percent_of_answer_kept, substring_len
@@ -112,6 +112,7 @@ def save_data_from_result(all_rows, all_columns, csv_name, excel_name):
 # -----------------------------------------------#
 # --------------Query function-------------------#
 # -----------------------------------------------#
+# Columns stored in the results file
 all_columns = [
         "Result_Id", "Correct_File", "Guessed_File",
         "Filename_Match", "Correct_Pages", "Guessed_Page",
@@ -156,6 +157,7 @@ def query_documents_all_embeddings(question, n_results=3):
             no_match = not (match_from_start_bool or match_from_end_bool)
             result_id = f"{value['id']}R{idx + 1}"
 
+            # Rows stored in results file. Order matters! Needs to match column order.
             row = [
                 result_id,
                 correct_file,
@@ -253,7 +255,7 @@ def query_documents_all_embeddings_parallel(question_dict, n_results=3):
     all_rows = [row for result in results for row in result]
     save_data_from_result(all_rows, all_columns, RESULTS_CSV_NAME, RESULTS_EXCEL_NAME)
 
-if __name__ == "__main__": #Needed for multiprocessing to work correctly
+if __name__ == "__main__": # Needed for multiprocessing to work correctly
     # --------------------------------------------------------------#
     # -------Get the data from toml files, with embedding-----------#
     # --------------------------------------------------------------#
