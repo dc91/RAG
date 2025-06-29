@@ -1,0 +1,6 @@
+Accuracy: 0.75
+Precision: 0.74
+Recall: 0.87
+Queries with results after filtering: 927
+Queries with no results after filtering: 103
+Total number of queries: 1030
