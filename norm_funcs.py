@@ -42,6 +42,7 @@ def clean_md_text(text):
     
     return CONTROL_SPACE_REGEX.sub('', merged_text).strip()
 
+# Still Norm 2
 def remove_md_stuff(text):
     content = re.sub(r'(?:\n)?#{1,6}|(?:\n)?```(?:.|\n)*?```|(?:\n)?---+|(?:\n)?___+', '', text)
 
