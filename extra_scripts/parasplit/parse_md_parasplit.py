@@ -2,6 +2,9 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
 import pathlib
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from config import (
     MD_DIRECTORY,
