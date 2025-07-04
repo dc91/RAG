@@ -1,10 +1,11 @@
-from concurrent.futures import ProcessPoolExecutor
+# from concurrent.futures import ProcessPoolExecutor
 # from langchain.text_splitter import MarkdownTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 import pymupdf4llm
 import os
 import pathlib
 import re
-import fitz
+# import fitz
 
 MD_DIRECTORY = "md_data"
 PDF_DIRECTORY = "pdf_data"
@@ -16,8 +17,8 @@ os.makedirs(out_base, exist_ok=True)
 os.makedirs(img_base, exist_ok=True)
 os.makedirs(md_base, exist_ok=True)
 os.makedirs(txt_base, exist_ok=True)
-MIN_CHUNK = 512
-MAX_CHUNK = 640
+MIN_CHUNK = 128
+MAX_CHUNK = 512
 CONTROL_SPACE_REGEX = re.compile(
     r'[\x00-\x1F\x7F\u00A0\u1680\u180E\u2000-\u200F\u2028\u2029\u202F\u205F\u2060\u2061\u2062\u2063\u2064\uFEFF]'
 )
@@ -42,28 +43,41 @@ CONTROL_SPACE_REGEX = re.compile(
 #     doc.close()
 #     return text_and_pagenumber
 
-def process_pdf(filename):
-    if not filename.endswith(".pdf"):
-        return
+# def process_pdf(filename):
+#     if not filename.endswith(".pdf"):
+#         return
     
-    pdf_path = os.path.join(PDF_DIRECTORY, filename)
-    doc = fitz.open(pdf_path)
-    filename_s = filename[:-4]
+#     pdf_path = os.path.join(PDF_DIRECTORY, filename)
+#     doc = fitz.open(pdf_path)
+#     filename_s = filename[:-4]
 
-    for i, page in enumerate(doc):
-        try:
-            file_path_md = os.path.join(md_base, f"{filename_s}_page{i+1}.md")
-            md_text = pymupdf4llm.to_markdown(
-                os.path.join(PDF_DIRECTORY, filename),
-                write_images=False,
-                pages=[i],
-                filename=filename_s,
-            )
-            pathlib.Path(file_path_md).write_bytes(md_text.encode())
-            print(f"✅ Processed: {filename}")
-        except Exception as e:
-            print(f"❌ Failed {filename}: {e}")
+#     for i, page in enumerate(doc):
+#         try:
+#             file_path_md = os.path.join(md_base, f"{filename_s}_page{i+1}.md")
+#             md_text = pymupdf4llm.to_markdown(
+#                 os.path.join(PDF_DIRECTORY, filename),
+#                 write_images=False,
+#                 pages=[i],
+#                 filename=filename_s,
+#             )
+#             pathlib.Path(file_path_md).write_bytes(md_text.encode())
+#             print(f"✅ Processed: {filename}")
+#         except Exception as e:
+#             print(f"❌ Failed {filename}: {e}")
         
+def process_pdf(filename):
+    for filename in os.listdir(PDF_DIRECTORY):
+            if filename.endswith(".pdf"):
+                filename_s = filename[:-4]  # Remove '.pdf'
+                # pdf_path = os.path.join(pdf_directory, filename)
+                file_path_md = os.path.join(md_base, filename[:-4] + ".md")
+
+                md_text = pymupdf4llm.to_markdown(
+                    f"./{PDF_DIRECTORY}/{filename}",
+                    write_images=False,
+                    filename=f"{filename_s}",
+                )
+                pathlib.Path(file_path_md).write_bytes(md_text.encode())
 
 def clean_md_text(text):
     # Split text into lines
@@ -135,9 +149,9 @@ def is_title_like(paragraph):
     words = paragraph.strip().split()
     return len(paragraph) < 50 and len(words) <= 6
 
-# def is_page_number_like(paragraph):
-#     words = paragraph.strip().split()
-#     return len(paragraph) < 5 and len(words) <= 2
+def is_page_number_like(paragraph):
+    stripped = paragraph.strip()
+    return stripped.isdigit() and 1 <= int(stripped) <= 999
 
 def split_into_paragraphs(text):
     lines = text.splitlines()
@@ -167,6 +181,8 @@ def split_into_paragraphs(text):
                 buffer = []
         else:
             # Normal paragraph line
+            if is_page_number_like(line):
+                continue
             buffer.append(line)
 
     # Add any trailing content
@@ -195,6 +211,8 @@ def para_split(text):
         if is_title_like(paragraph):
             title_buffer = paragraph
             continue
+        
+        
 
         if title_buffer:
             paragraph = title_buffer + " " + paragraph
@@ -257,8 +275,7 @@ def para_split(text):
     return merged_chunks
 
 
-
-def merge_short_docs(docs, min_length=640):
+def merge_short_docs(docs, min_length=100):
     if not docs:
         return []
 
@@ -274,49 +291,72 @@ def merge_short_docs(docs, min_length=640):
 
     return merged_docs
 
-def normalize_text(input_text):
-    # Remove split words at the end of lines
-    normalized = re.sub(r"- ?\n", "", input_text.strip())
-    # Replace any sequence of whitespace (including newlines) with a single space
-    normalized = re.sub(r"\s+", " ", normalized)
-    # Don't keep space if end of sentence
-    normalized = re.sub(r" +\.\s", ". ", normalized)
+# def normalize_text(input_text):
+#     # Remove split words at the end of lines
+#     normalized = re.sub(r"- ?\n", "", input_text.strip())
+#     # Replace any sequence of whitespace (including newlines) with a single space
+#     normalized = re.sub(r"\s+", " ", normalized)
+#     # Don't keep space if end of sentence
+#     normalized = re.sub(r" +\.\s", ". ", normalized)
 
-    return normalized
+#     return normalized
 
 if __name__ == "__main__":
-    pdf_files = [f for f in os.listdir(PDF_DIRECTORY) if f.endswith(".pdf")]
-    with ProcessPoolExecutor() as executor:
-        executor.map(process_pdf, pdf_files)
+    # pdf_files = [f for f in os.listdir(PDF_DIRECTORY) if f.endswith(".pdf")]
+    # with ProcessPoolExecutor() as executor:
+    #     executor.map(process_pdf, pdf_files)
         
-    # md_files = list(pathlib.Path(md_base).rglob("*.md"))
-    # # splitter = MarkdownTextSplitter(chunk_size=MIN_CHUNK, chunk_overlap=0)
-    # for md_file in md_files:
-    #     # Read the .md file
-    #     with md_file.open("r", encoding="utf-8") as f:
-    #         markdown_text = f.read()
+    md_files = list(pathlib.Path(md_base).rglob("*.md"))
+    # splitter = MarkdownTextSplitter(chunk_size=MIN_CHUNK, chunk_overlap=0)
+    # splitter = RecursiveCharacterTextSplitter(
+    #     # Set a really small chunk size, just to show.
+    #     chunk_size=512,
+    #     chunk_overlap=0,
+    #     length_function=len,
+    #     separators=["\n\n", "\n", ".", "?", "!", " ", ""],
+    # )
+    splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+        model_name="text-embedding-3-small",
+        chunk_size=128,
+        chunk_overlap=0,
+    )
+    ShortCount=0
+    for md_file in md_files:
+        # Read the .md file
+        with md_file.open("r", encoding="utf-8") as f:
+            markdown_text = f.read()
 
-    #     markdown_text = remove_md_stuff(markdown_text)
-    #     # Split into chunks
-    #     docs = para_split(markdown_text)
-    #     # docs = splitter.split_text(markdown_text)
-    #     # docs = merge_short_docs(docs, min_length=640)
+        # markdown_text = remove_md_stuff(markdown_text)
+        # Split into chunks
+        # docs = para_split(markdown_text)
+        docs = splitter.split_text(markdown_text)
+        # pre = len(docs)
+        
+        docs = merge_short_docs(docs, min_length=100)
+        # docs = merge_short_docs(docs, min_length=200)
 
-    #     # Get the relative path from md_base
-    #     relative_path = md_file.relative_to(md_base)
+        # post = len(docs)
+        # if not pre == post:
+        #     print("DIFF: ", pre, " | " ,post)
+        # Get the relative path from md_base
+        relative_path = md_file.relative_to(md_base)
 
-    #     # Build the new path under txt_base with .txt extension
-    #     txt_file_path = txt_base / relative_path.with_suffix(".txt")
+        # Build the new path under txt_base with .txt extension
+        txt_file_path = txt_base / relative_path.with_suffix(".txt")
 
-    #     # Ensure the parent directory exists
-    #     txt_file_path.parent.mkdir(parents=True, exist_ok=True)
-
-    #     # Write chunks to the new .txt file
-    #     with txt_file_path.open("w", encoding="utf-8") as f:
-    #         # f.write(f"Chunk: 1\n{clean_md_text(markdown_text)}\n\n")
-    #         for i, chunk in enumerate(docs):
-    #             # chunk = remove_md_stuff(chunk)
-    #             chunk = clean_md_text(chunk)
-    #             # if not is_page_number_like(chunk):
-    #             #     f.write(f"Chunk: {i+1}\n{chunk}\n\n")
-    #             f.write(f"Chunk: {i+1}\n{chunk}\n\n")
+        # Ensure the parent directory exists
+        txt_file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Write chunks to the new .txt file
+        with txt_file_path.open("w", encoding="utf-8") as f:
+            # f.write(f"Chunk: 1\n{clean_md_text(markdown_text)}\n\n")
+            for i, chunk in enumerate(docs):
+                if len(chunk) < 100:
+                    ShortCount+=1
+                chunk = remove_md_stuff(chunk)
+                # chunk = clean_md_text(chunk)
+                # if not is_page_number_like(chunk):
+                #     f.write(f"Chunk: {i+1}\n{chunk}\n\n")
+                f.write(f"Chunk: {i+1}\n{chunk}\n\n")
+    if ShortCount > 0:
+        print(ShortCount)

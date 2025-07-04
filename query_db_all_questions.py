@@ -142,7 +142,10 @@ def query_documents_all_embeddings(question, n_results=3):
 
             correct_pages = value["files"][0]["page_numbers"]
             guessed_page = metadata.get("page_number")
-            guessed_page_list = list(map(int, guessed_page.split(",")))
+            if isinstance(guessed_page, int): # The md script gives an int as pagenumber
+                guessed_page_list = [guessed_page]
+            else:
+                guessed_page_list = list(map(int, guessed_page.split(",")))
             # Don't check for page matches if wrong file
             page_match = any(page in correct_pages for page in guessed_page_list) if filename_match else False
 
@@ -202,7 +205,10 @@ def process_question(value, n_results):
 
         correct_pages = value["files"][0]["page_numbers"]
         guessed_page = metadata.get("page_number")
-        guessed_page_list = list(map(int, guessed_page.split(",")))
+        if isinstance(guessed_page, int): # The md script gives an int as pagenumber
+            guessed_page_list = [guessed_page]
+        else:
+            guessed_page_list = list(map(int, guessed_page.split(",")))
         page_match = any(page in correct_pages for page in guessed_page_list) if filename_match else False
 
         (

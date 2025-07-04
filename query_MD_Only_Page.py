@@ -17,7 +17,6 @@ from config import (
     get_results_filenames
 )
 
-# load_dotenv()
 RESULTS_CSV_NAME, RESULTS_EXCEL_NAME = get_results_filenames()
 collection = get_collection()
 

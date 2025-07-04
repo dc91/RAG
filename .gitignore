@@ -3,12 +3,14 @@
 /compare*
 /questions/raw
 /questions/questionsOG
+/questions/embeddedLarge
 # /pdf_data
+*.png
 /temp_pdf
-# /results
 /findPDF.py
 /txt_data
 /md_data
+/md_data_NoPage
 /.vscode
 /docs*
 /VERSIONS
