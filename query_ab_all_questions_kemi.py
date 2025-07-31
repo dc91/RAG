@@ -9,6 +9,7 @@ from config import (
     MIN_ANS_LENGTH,
     RERANK,
     RERANK_MODEL,
+    FILTER_BY_REG_NR,
     USE_LLM_ANSWERS,
     SYS_PROMPT_FOR_OUTPUT,
     get_collection,
@@ -23,6 +24,8 @@ if RERANK:
         rerank_cohere,
         rerank_jina_api,
     )  # rerank_cohere, rerank_jina_api, rerank_jina_local
+
+
 
 RESULTS_CSV_NAME, RESULTS_EXCEL_NAME = get_results_filenames()
 collection = get_collection()
@@ -54,6 +57,7 @@ def get_embedded_questions(toml_dir):
 # since that is a bad match anyway.
 def check_shrinking_matches_no_tolerance(text_list, chunk, shrink_from_start=False):
     chunk = chunk.lower()
+    # chunk = normalize_spaces(chunk) # If not using markdown, helps with matching
     text_len = len(text_list)
     for i in range(text_len - MIN_ANS_LENGTH):
         current = text_list[i:] if shrink_from_start else text_list[: text_len - i]
@@ -64,17 +68,18 @@ def check_shrinking_matches_no_tolerance(text_list, chunk, shrink_from_start=Fal
     return False, 0, 0
 
 
+# Only applies to non-markdown toml files, markdown toml files have different answer structure
+def clean_element(element,):  
+    if "Tabell:" in element:
+        parts = element.split("Tabell:")
+        if parts[0].strip():  # If there's text before "Tabell:"
+            return parts[0].strip()
+    return element  # Either no "Tabell:" or nothing before it
 
-# Selection of function type based on need for parallel processing
-def get_text_match_info(question, document):
-    func = check_shrinking_matches_no_tolerance
-    answer_list = list(question["answer"])
-    match_from_start = func(answer_list, document, shrink_from_start=False)
-    match_from_end = func(answer_list, document, shrink_from_start=True)
-    return (*match_from_start, *match_from_end)
 
-
-# Only concerns the excel file output
+# Only concerns the excel file output, it does not like certain characters as the first character.
+# Here I only check for '=', but there might be others that case a problem.
+# However, this does not affect the csv files, where the data is extracted later.
 def escape_excel_formulas(val):
     if isinstance(val, str) and val.startswith("="):
         return "'" + val
@@ -95,24 +100,33 @@ def save_data_from_result(all_rows, all_columns, csv_name, excel_name):
 # -----------------------------------------------#
 # Columns stored in the results file
 all_columns = [
-        "Result_Id", "Correct_File", "Guessed_File",
-        "Filename_Match", "Correct_Pages", "Guessed_Page",
-        "Page_Match", "Distance", "Text_Match_Start_Percent",
-        "Match_Length_Start", "Text_Match_End_Percent",
-        "Match_Length_End", "No_match", "Match_Threshold",
-        "Difficulty", "Category", "Expected_answer",
-        "Question", "Returned_Chunk", "Chunk_Id", "LLM_ANS"
-    ]
+    "Result_Id", "Correct_File", "Guessed_File",
+    "Filename_Match", "Correct_Pages", "Guessed_Page",
+    "Page_Match", "Distance", "Text_Match_Start_Percent",
+    "Match_Length_Start", "Text_Match_End_Percent", "Match_Length_End",
+    "No_match", "Match_Threshold", "Difficulty",
+    "Category", "Expected_answer", "Question",
+    "Returned_Chunk", "Chunk_Id", "LLM_ANS",
+]
 
 
-def query_documents_all_embeddings(question, n_results=3):
+def query_documents_all_embeddings(questions, n_results=3):
     all_rows = []
-    for question in tqdm(question.values(), desc="Processing questions"):
-        results = collection.query(
-            query_embeddings=[question["question_embedding"]], n_results=n_results
-        )
+    for question in tqdm(questions.values(), desc="Processing questions"):
+        if FILTER_BY_REG_NR:
+            reg_nr = question["reg_nr"]  # If you want to filter by reg_nr
+            results = collection.query(
+                query_embeddings=[question["question_embedding"]],
+                n_results=n_results,
+                where={"reg_nr": reg_nr},
+            )
+        else:
+            results = collection.query(
+                query_embeddings=[question["question_embedding"]], n_results=n_results
+            )
+            
         results_to_use = results["documents"][0]
-        
+
         if RERANK:
             if RERANK_MODEL == "COHERE":
                 func = rerank_cohere
@@ -129,7 +143,7 @@ def query_documents_all_embeddings(question, n_results=3):
 
             reranked_results = func(question["question"], results["documents"][0], 5)
             results_to_use = reranked_results
-        
+
         for idx, document in enumerate(results_to_use):
             # document here refers to chunks, due to chromadb naming
             # so we are looking at the results for returned chunks here.
@@ -140,7 +154,8 @@ def query_documents_all_embeddings(question, n_results=3):
                 str(question["files"][i]["file"])[:-4].lower()
                 for i, f in enumerate(question["files"])
             ]
-            guessed_file = metadata.get("filename")[:-4].lower() # since toml parser might change case
+            guessed_file = metadata.get("filename")[:-4].lower()  # since toml parser might change case
+
             file_index_answer = 0
             correct_file = correct_files[file_index_answer]
             # Since questions can be answered in multiple files,
@@ -149,17 +164,32 @@ def query_documents_all_embeddings(question, n_results=3):
             if filename_match:
                 file_index_answer = correct_files.index(guessed_file)
                 correct_file = correct_files[file_index_answer]
-            
 
-            correct_pages = question["files"][0]["page_numbers"]
+            correct_pages = question["files"][file_index_answer]["page_numbers"]
             guessed_page = metadata.get("page_number")
             guessed_page_list = list(map(int, guessed_page.split(",")))
             # Don't check for page matches if wrong file
-            page_match = any(page in correct_pages for page in guessed_page_list) if filename_match else False
+            page_match = (
+                any(page in correct_pages for page in guessed_page_list)
+                if filename_match
+                else False
+            )
 
-            (match_from_start_bool, match_from_start_float,
-                match_from_start_length, match_from_end_bool,
-                match_from_end_float, match_from_end_length,) = get_text_match_info(question, document)
+            # Get text match info
+            (match_from_start_bool, match_from_start_float, match_from_start_length) = (
+                check_shrinking_matches_no_tolerance(
+                    list(question["files"][file_index_answer]["file_answer"]),
+                    document,
+                    shrink_from_start=False,
+                )
+            )
+            (match_from_end_bool, match_from_end_float, match_from_end_length) = (
+                check_shrinking_matches_no_tolerance(
+                    list(question["files"][file_index_answer]["file_answer"]),
+                    document,
+                    shrink_from_start=True,
+                )
+            )
             # We need to figure out what the thershold is, and how to calculate it. This adds both matches.
             # We could use match length somehow as well?
             match_threshold = (
@@ -185,8 +215,8 @@ def query_documents_all_embeddings(question, n_results=3):
                 no_match,
                 match_threshold,
                 question["difficulty"],
-                question["category"],
-                question["answer"],
+                question["subject"],
+                question["files"][0]["file_answer"],
                 question["question"],
                 document,
                 results["ids"][0][idx],
@@ -205,6 +235,7 @@ def query_documents_all_embeddings(question, n_results=3):
     # Save results to file
     save_data_from_result(all_rows, all_columns, RESULTS_CSV_NAME, RESULTS_EXCEL_NAME)
 
+
 # --------------------------------------------------------------#
 # -------Get the data from toml files, with embedding-----------#
 # --------------------------------------------------------------#
@@ -213,4 +244,5 @@ question_dict = get_embedded_questions(TOML_DIRECTORY_EMBEDDED)
 # --------------------------------------------------------------#
 # -------------Run an embedded query from toml files------------#
 # --------------------------------------------------------------#
+
 query_documents_all_embeddings(question_dict, n_results=RESULTS_PER_QUERY)

@@ -1,4 +1,5 @@
 import os
+from openai import OpenAI
 import tomli
 from Levenshtein import distance
 from Levenshtein import ratio
@@ -10,6 +11,7 @@ from config import (
     get_collection,
     get_client
 )
+from norm_funcs import normalize_spaces
 
 collection = get_collection()
 
@@ -94,43 +96,8 @@ def query_documents_one_embedding(question, n_results=3):
         query_embeddings=question, n_results=n_results
     )
     for idx, document in enumerate(results["documents"][:]):
-        distance = results["distances"][0][idx]
-        metadata = results["metadatas"][0][idx]  # Include metadata if needed
-        print("\n\n")
-        print("-" * 60)
-        print("-" * 20, f"Result {idx + 1}", "-" * 20)
-        print("-" * 60)
-        print("Question: ", question)
-        # print("Answer expected: ", question["answer"])
-        # print(
-        #     "\nFile from result: ",
-        #     metadata.get("filename"),
-        #     " | File from toml: ",
-        #     question["files"][0]["file"],
-        # )
-        # if metadata.get("filename") == question["files"][0]["file"]:
-        #     print("Right File!")
-        #     print(
-        #         "Pages from result",
-        #         question["files"][0]["page_numbers"],
-        #         " | Pages from toml: ",
-        #         metadata.get("page_number"),
-        #     )
-        #     guessed_page_list = list(map(int, metadata.get("page_number").split(",")))
-        #     page_match = any(page in question["files"][0]["page_numbers"] for page in guessed_page_list) if metadata.get("filename") == question["files"][0]["file"] else False
-        #     if page_match:
-        #         print("Right Pages!")
-        #     else:
-        #         print("Wrong Pages!")
-        # else:
-        #     print("Wrong File!")
-        print("Distance between question and chunk embedding: ", distance)
-        print("-" * 30)
-        print(document)
-        print(metadata)
-        # match_strings(
-        #     document, question["answer"]
-        # )  # Does not use the returns, just the prints
+        # print(document)
+        return document
 
 
 # --------------------------------------------------------------#
@@ -141,9 +108,43 @@ def query_documents_one_embedding(question, n_results=3):
 # --------------------------------------------------------------#
 # -------------Run an embedded query from toml files------------#
 # --------------------------------------------------------------#
-q = "Vad händer om man får Roxy XL på huden?"
+q = "Hur lång tid måste jag vänta mellan varje behandling med Argos?"
 response = get_client().embeddings.create(input=q, model=EMBEDDING_MODEL_NAME)
 q_emb = [d.embedding for d in response.data]
 
-query_documents_one_embedding(q_emb, n_results=RESULTS_PER_QUERY)
+relevant_chunks = query_documents_one_embedding(q_emb, n_results=2)
 # query_documents_one_embedding(question_dict["DC021"], n_results=RESULTS_PER_QUERY)
+
+# -----------------------------------------------#
+# -------------Response from OpenAI--------------#
+# -----------------------------------------------#
+def generate_response(question, relevant_chunks):
+    context = "\n\n".join(relevant_chunks)
+    # context = normalize_spaces(context)
+    prompt = ("""
+        Använd endast det angivna kontextet för att besvara frågan. Lägg inte till information. Om du inte kan svaret på frågan i kontextet,
+        säg att du inte vet svaret. Var kortfattad och koncis.
+        """
+        "\nKontext:\n" + context + "\nFråga:\n" + question
+    )
+    client_local = OpenAI(base_url="http://192.168.8.3:1234/v1", api_key="not-needed")
+    response = client_local.chat.completions.create(
+        model="local",
+        messages=[
+            {
+                "role": "system",
+                "content": prompt,
+            },
+            {
+                "role": "user",
+                "content": question,
+            },
+        ],
+    )
+
+    answer = response.choices[0].message
+    return answer
+
+
+answer = generate_response(q, relevant_chunks)
+print("Fråga: ", q, "\n\nSvar:", answer.content)

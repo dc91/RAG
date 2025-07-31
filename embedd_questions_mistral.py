@@ -6,29 +6,34 @@
 # ----to choose which file to read.
 
 import os
-from tomlkit import (
-    parse,
-    dumps,
-)
+import time
+import threading
+from mistralai import Mistral
+from tomlkit import parse, dumps
 from tqdm import tqdm
 from config import (
-    TOML_DIRECTORY_CLEANED,
-    TOML_DIRECTORY_EMBEDDED,
-    EMBEDDING_MODEL_NAME,
-    get_client,
-    # AUTOMODEL_CUSTOM # If using AutoModel, from transformers library
-)
+    EMBEDDING_MODEL_NAME, 
+    MISTRAL_KEY, 
+    TOML_DIRECTORY_CLEANED, 
+    TOML_DIRECTORY_EMBEDDED
+    )
 
-BATCH_SIZE = 50
-client = get_client()
+client = Mistral(api_key=MISTRAL_KEY)
+rate_lock = threading.Lock()
+last_call_time = [0.0]  # use list for mutability across threads
+RATE_LIMIT = 6  # calls per second
+MIN_INTERVAL = 1.0 / RATE_LIMIT
 
-# If using AutoModel, from transformers library. Make sure to adjust for the specific model.
-# def get_embedding(question): 
-#     emb = AUTOMODEL_CUSTOM.encode(question, task="retrieval.query").tolist()
-#     return emb
-    
-def get_embedding(question):
-    return client.embeddings.create(input=question, model=EMBEDDING_MODEL_NAME).data[0].embedding
+
+def rate_limited_embedding(question):
+    with rate_lock:
+        now = time.time()
+        wait_time = MIN_INTERVAL - (now - last_call_time[0])
+        if wait_time > 0:
+            time.sleep(wait_time)
+        last_call_time[0] = time.time()
+        return client.embeddings.create(model=EMBEDDING_MODEL_NAME, inputs=question).data[0].embedding
+
 
 def add_embeddings_to_toml(toml_dir):
     toml_files = [f for f in os.listdir(toml_dir) if f.endswith(".toml")]
@@ -37,16 +42,12 @@ def add_embeddings_to_toml(toml_dir):
         full_path = os.path.join(TOML_DIRECTORY_CLEANED, toml_file)
         with open(full_path, "r", encoding="utf-8") as f:
             toml_file_edit = parse(f.read())
-        for i in range(0, len(toml_file_edit["questions"]), BATCH_SIZE):
-            batch = toml_file_edit["questions"][i:i + BATCH_SIZE]
-            
-            for question in batch:
-                question["question_embedding"] = get_embedding(question["question"])
+        for question in toml_file_edit["questions"]:
+            question["question_embedding"] = rate_limited_embedding(question["question"])
         os.makedirs(TOML_DIRECTORY_EMBEDDED, exist_ok=True)
         out_path = os.path.join(TOML_DIRECTORY_EMBEDDED, f"embedded_{toml_file}")
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(dumps(toml_file_edit))
-
 
 # --------------------------------------------------------------#
 # -------Write new toml files with embeddings included----------#

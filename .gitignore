@@ -1,9 +1,7 @@
 /.env
 /.venv
 /compare*
-/questions/raw
-/questions/questionsOG
-/questions/embeddedLarge
+/questions
 # /pdf_data
 *.png
 /temp_pdf
@@ -16,3 +14,7 @@
 /VERSIONS
 /__pycache__
 config.py
+/extra_*
+/databases
+/KEMI_*
+/results

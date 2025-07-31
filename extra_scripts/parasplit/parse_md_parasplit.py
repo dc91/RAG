@@ -14,7 +14,7 @@ from config import (
     get_client,
 )
 from norm_funcs import clean_md_text, remove_md_stuff
-from parasplit import merge_short_docs, para_split
+from extra_scripts.parasplit.parasplit import merge_short_docs, para_split
 
 collection = get_collection()
 client = get_client()

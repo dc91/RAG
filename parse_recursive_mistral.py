@@ -6,10 +6,10 @@
 
 import fitz  # PyMuPDF
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import multiprocessing
+# from concurrent.futures import ThreadPoolExecutor, as_completed
+# import multiprocessing
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-
+from ratelimit import limits, sleep_and_retry
 
 from config import (
     PDF_DIRECTORY,
@@ -17,10 +17,11 @@ from config import (
     TOKEN_ENCODER,
     MAX_TOKENS,
     OVERLAP,
+    USE_OPENAI,
     get_collection,
     get_client
 )
-# from norm_funcs import normalize_text
+
 
 collection = get_collection() # set up db
 client = get_client() # OpenAI client for embeddings
@@ -36,7 +37,6 @@ def parse_document(pdf_path):
     for i, page in enumerate(doc):
         text = page.get_text(sort=True) # sort helps keep the right reading order in the page
         if text.strip():  # Skip empty pages
-            # norm_text = normalize_text(text)
             text_and_pagenumber.append((i + 1, text + " "))
     doc.close()
     return text_and_pagenumber
@@ -46,14 +46,24 @@ def parse_document(pdf_path):
 # -----------------------------------------------#
 # -------------Tokenize and Chunk up-------------#
 # -----------------------------------------------#
+def get_token_count(string: str) -> int:
+    """Returns the number of tokens in a text string."""
+    encoding = TOKEN_ENCODER
+    if USE_OPENAI:
+        num_tokens = len(encoding.encode(string, disallowed_special=()))
+    else:
+        num_tokens = len(encoding.encode(text=string, add_special_tokens=False))
+    return num_tokens
+
 def chunk_pdf_by_paragraph_tokens(pdf_path, MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERLAP):
     filename = os.path.basename(pdf_path)
     text_and_pagenumber = parse_document(pdf_path)  # [(page_number, page_text)]
-
-    splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-        model_name=EMBEDDING_MODEL_NAME,
+    
+    splitter = RecursiveCharacterTextSplitter(
+        length_function=get_token_count,
         chunk_size=MAX_TOKENS,
         chunk_overlap=OVERLAP,
+        separators=["\n\n", "\n", ".", "?", "!", " ", ""]
     )
 
     all_paragraphs = []
@@ -76,7 +86,7 @@ def chunk_pdf_by_paragraph_tokens(pdf_path, MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERL
         if not current_chunk:
             return
         chunk_text = " ".join(current_chunk)
-        token_chunk = TOKEN_ENCODER.encode(chunk_text)
+        token_chunk = TOKEN_ENCODER.encode(chunk_text, add_special_tokens=False)
         page_list = sorted(set(chunk_page_numbers))
         chunk_metadata = {
             "id": f"{filename}_chunk{chunk_index}",
@@ -95,7 +105,7 @@ def chunk_pdf_by_paragraph_tokens(pdf_path, MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERL
     chunk_page_numbers = []
 
     for paragraph, page_number in zip(all_paragraphs, paragraph_page_map):
-        tokens = TOKEN_ENCODER.encode(paragraph)
+        tokens = TOKEN_ENCODER.encode(paragraph, add_special_tokens=False)
         if current_token_count + len(tokens) > MAX_TOKENS:
             finalize_chunk()
             chunk_page_numbers = []
@@ -115,44 +125,43 @@ def chunk_pdf_by_paragraph_tokens(pdf_path, MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERL
 # -----------------------------------------------#
 # -----Embedd PDFs and Insert to ChromaDB--------#
 # -----------------------------------------------#
-def get_max_workers(factor=1.5, fallback=4):
-    try:
-        return max(1, int(multiprocessing.cpu_count() * factor))
-    except NotImplementedError:
-        return fallback
+MAX_CALLS_PER_SECOND = 6
+
+@sleep_and_retry
+@limits(calls=MAX_CALLS_PER_SECOND, period=1)
+def call_embedding_api(model, inputs):
+    return client.embeddings.create(model=model, inputs=inputs)
 
 # Get embeddings of chunks from client, store with metadata in db
-def embed_and_insert(chunk):
-    chunk_id = chunk["metadata"]["id"]
-    try:
-        embedding = client.embeddings.create(
-            input=chunk["text"], model=EMBEDDING_MODEL_NAME
-        ).data[0].embedding
+def batch_embed_and_insert(chunks, batch_size=50):
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i : i + batch_size]
+        texts = [chunk["text"] for chunk in batch]
+        metadatas = [chunk["metadata"] for chunk in batch]
+        ids = [chunk["metadata"]["id"] for chunk in batch]
 
-        collection.upsert(
-            ids=[chunk_id],
-            documents=[chunk["text"]],
-            embeddings=[embedding],
-            metadatas=[chunk["metadata"]],
-        )
-    except Exception as e:
-        print(f"[Error] Failed for {chunk_id}: {e}")
+        try:
+            response = call_embedding_api(EMBEDDING_MODEL_NAME, texts)
+            embeddings = [d.embedding for d in response.data]
+
+            collection.upsert(
+                ids=ids,
+                documents=texts,
+                embeddings=embeddings,
+                metadatas=metadatas,
+            )
+        except Exception as e:
+            print(f"[Error] Failed to embed batch starting at index {i}: {e}")
         
 # Get all chunks and call the embed_and_insert(chunk) function for all of them. With multiprocessing
-def process_pdfs_and_insert(directory, max_workers=None):
-    if max_workers is None:
-        max_workers = get_max_workers()
-
+def process_pdfs_and_insert(directory, batch_size=50):
     for filename in os.listdir(directory):
         if filename.endswith(".pdf"):
             pdf_path = os.path.join(directory, filename)
             print(f"\n📄 Processing file: {filename}")
             chunks = chunk_pdf_by_paragraph_tokens(pdf_path)
 
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = [executor.submit(embed_and_insert, chunk) for chunk in chunks]
-                for future in as_completed(futures):
-                    future.result()
+            batch_embed_and_insert(chunks, batch_size=batch_size)
 
             print(f"✅ Finished processing: {filename}")
 

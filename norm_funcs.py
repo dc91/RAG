@@ -57,3 +57,7 @@ def remove_md_stuff(text):
         
     return content
 
+def normalize_spaces(input_text):
+    normalized = re.sub(r" +", " ", input_text)
+
+    return normalized

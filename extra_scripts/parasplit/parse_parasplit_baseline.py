@@ -21,7 +21,7 @@ from config import (
     get_client
 )
 # from norm_funcs import normalize_text
-from parasplit import para_split
+from extra_scripts.parasplit.parasplit import para_split
 
 collection = get_collection() # set up db
 client = get_client() # OpenAI client for embeddings

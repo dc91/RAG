@@ -18,11 +18,11 @@ from config import (
 
 def normalize_text(input_text):
     # Remove split words at the end of lines
-    normalized = re.sub(r"- ?\n", "", input_text.strip())
+    # normalized = re.sub(r"- ?\n", "", input_text.strip())
     # Replace any sequence of whitespace (including newlines) with a single space
-    normalized = re.sub(r"\s+", " ", normalized)
+    normalized = re.sub(r" +", " ", input_text)
     # Don't keep space if end of sentence
-    normalized = re.sub(r" +\.\s", ". ", normalized) 
+    # normalized = re.sub(r" +\.\s", ". ", normalized) 
     
     return normalized
 
