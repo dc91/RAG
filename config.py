@@ -24,9 +24,9 @@ JINA_KEY = os.getenv("JINA_API_KEY")
 #---------------------------------------#
 #---------------Directories-------------#
 #---------------------------------------#
-PDF_DIRECTORY = "pdf_data"
-TOML_DIRECTORY_CLEANED = "questions/raw"
-TOML_DIRECTORY_EMBEDDED = "questions/embedded"
+PDF_DIRECTORY = "KEMI_PDF_SMALL"
+TOML_DIRECTORY_CLEANED = "questions/kemi_raw"
+TOML_DIRECTORY_EMBEDDED = "questions/embedded_kemi_md"
 OUTPUT_DIRECTORY_COMPARE_SPLITS = "compare_splits_from_parser"
 RESULTS_DIRECTORY = "results"
 MD_DIRECTORY = "md_data/md"
@@ -46,7 +46,7 @@ RERANK_MODEL = "COHERE"# "COHERE", "JINA_API" or "JINA_LOCAL"
 #---------------------------------------#
 PARSE_AS_MD = True
 USE_RECURSIVE_SPLIT = False
-MAX_TOKENS = 256
+MAX_TOKENS = 512
 OVERLAP =  0
 
 
@@ -83,7 +83,7 @@ def get_client():
 #---------------------------------------#
 # -----------ChromaDB Configs-----------#
 #---------------------------------------#
-BASE_NAME_VERSION = "CONTEXT_TEST2_BASELINE_N0"
+BASE_NAME_VERSION = "CONTXT_KEMI_TEST3_BASE_N0"
 COS = True
 if COS:
     BASE_NAME_VERSION = f"COS_{BASE_NAME_VERSION}"

@@ -18,3 +18,5 @@ config.py
 /databases
 /KEMI_*
 /results
+/helping_scripts/__*
+main.py

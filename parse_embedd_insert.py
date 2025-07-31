@@ -17,8 +17,8 @@ from config import (
     get_collection,
     get_client
 )
-# from chunking_kemi import chunk_pdf_recursive_token_size, chunk_pdf_by_tokens
-from chunking import chunk_pdf_recursive_token_size, chunk_pdf_by_tokens
+from helping_scripts.chunking_kemi import chunk_pdf_recursive_token_size, chunk_pdf_by_tokens
+# from helping_scripts.chunking import chunk_pdf_recursive_token_size, chunk_pdf_by_tokens
 # from norm_funcs import normalize_spaces
 
 collection = get_collection() # set up db

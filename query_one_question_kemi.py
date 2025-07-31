@@ -11,7 +11,7 @@ from config import (
     get_collection,
     get_client
 )
-from norm_funcs import normalize_spaces
+from helping_scripts.norm_funcs import normalize_spaces
 
 collection = get_collection()
 

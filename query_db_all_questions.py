@@ -17,9 +17,9 @@ from config import (
 # from norm_funcs import normalize_spaces
 
 if USE_LLM_ANSWERS:
-    from generate_llm_response import generate_response_from_context
+    from helping_scripts.generate_llm_response import generate_response_from_context
 if RERANK:
-    from reranking import (
+    from helping_scripts.reranking import (
         rerank_cohere,
         rerank_jina_api,
     )  # rerank_cohere, rerank_jina_api, rerank_jina_local
