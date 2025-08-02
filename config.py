@@ -29,7 +29,7 @@ TOML_DIRECTORY_CLEANED = "questions/cleaned"
 TOML_DIRECTORY_EMBEDDED = "questions/embedded"
 OUTPUT_DIRECTORY_COMPARE_SPLITS = "compare_splits_from_parser"
 RESULTS_DIRECTORY = "results_new"
-MD_DIRECTORY = "md_data/md" # If you choose 
+MD_DIRECTORY = "md_data" # If you choose 
 LOCAL_BASE_URL = "http://192.168.8.3:1234/v1"
 
 #---------------------------------------#
@@ -45,10 +45,10 @@ RERANK_MODEL = "COHERE"# "COHERE", "JINA_API" or "JINA_LOCAL"
 #---------------------------------------#
 #----------------Parsing----------------#
 #---------------------------------------#
-PARSE_AS_MD = True
+PARSE_AS_MD = False
 USE_RECURSIVE_SPLIT = True
 NORMALIZE_AT_PARSE = False
-MAX_TOKENS = 128
+MAX_TOKENS = 256
 OVERLAP =  0
 
 

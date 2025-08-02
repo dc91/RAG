@@ -7,10 +7,12 @@
 
 import fitz  # PyMuPDF
 import os
-import pymupdf4llm
+# import pymupdf4llm
+from tqdm import tqdm
 
 from config import (
     PDF_DIRECTORY,
+    MD_DIRECTORY,
     EMBEDDING_MODEL_NAME,
     USE_RECURSIVE_SPLIT,
     PARSE_AS_MD,
@@ -29,13 +31,16 @@ client = get_client() # Client for embeddings
 # -----------------------------------------------#
 # --------------------Parse----------------------#
 # -----------------------------------------------#
-def parse_document(pdf_path):
+def parse_document(pdf_path, filename):
     doc = fitz.open(pdf_path)
     text_and_pagenumber = []  # List [(page_number, page_text)]
 
     for i, page in enumerate(doc):
         if PARSE_AS_MD:
-            text = pymupdf4llm.to_markdown(doc, pages=[i])
+            md_path = os.path.join(MD_DIRECTORY, filename[:-4] + f"_page{i+1}.md")
+            with open(md_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+            # text = pymupdf4llm.to_markdown(doc, pages=[i])
         else:
             text = page.get_text(sort=True) # sort helps keep the right reading order in the page
         if text.strip():  # Skip empty pages
@@ -52,7 +57,7 @@ def parse_document(pdf_path):
 # Get embeddings of chunks from client, store with metadata in db
 
 def embed_and_insert_batch(chunks, batch_size=50):
-    for i in range(0, len(chunks), batch_size):
+    for i in tqdm(range(0, len(chunks), batch_size), desc="Embedding and inserting batches"):
         batch = chunks[i : i + batch_size]
         texts = [chunk["text"] for chunk in batch]
         metadatas = [chunk["metadata"] for chunk in batch]
@@ -76,7 +81,7 @@ def process_pdfs_and_insert(directory, batch_size=50):
     for filename in os.listdir(directory):
         if filename.endswith(".pdf"):
             pdf_path = os.path.join(directory, filename)
-            print(f"\n📄 Processing file: {filename}")
+            print(f"\n📄 Parsing: {filename}")
             if USE_RECURSIVE_SPLIT:
                 chunks = chunk_pdf_recursive_token_size(pdf_path, parse_document=parse_document)
             else:

@@ -42,7 +42,7 @@ def get_page_span(token_page_map, chunk_pages):
 #------------------------------------#
 def chunk_pdf_by_tokens(pdf_path, parse_document, MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERLAP):
     filename = os.path.basename(pdf_path)
-    text_and_pagenumber = parse_document(pdf_path)  # List [(page_number, page_text)]
+    text_and_pagenumber = parse_document(pdf_path, filename)  # List [(page_number, page_text)]
     chunks = []
     all_tokens = []
     token_page_map = []  # Keeps track of which page each token came from, [page number of token1, token2, token3 ...]
@@ -93,7 +93,7 @@ def chunk_pdf_by_tokens(pdf_path, parse_document, MAX_TOKENS=MAX_TOKENS, OVERLAP
 #------------------------------------#
 def chunk_pdf_recursive_token_size(pdf_path, parse_document, MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERLAP):
     filename = os.path.basename(pdf_path)
-    text_and_pagenumber = parse_document(pdf_path)  # [(page_number, page_text)]
+    text_and_pagenumber = parse_document(pdf_path, filename)  # [(page_number, page_text)]
     
     splitter = RecursiveCharacterTextSplitter(
         length_function=get_token_count,
