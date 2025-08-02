@@ -22,7 +22,7 @@ def query_documents_one_embedding(question, n_results=3):
 # -----------------------------------------------#
 # --------------Question embedding---------------#
 # -----------------------------------------------#
-question = "Hur lång tid måste jag vänta mellan varje behandling med Revystar XL?"
+question = "Vad innebär det om en webbplats följer riktlinjerna i WCAG 2.0?"
 response = get_client().embeddings.create(input=question, model=EMBEDDING_MODEL_NAME)
 question_emb = response.data[0].embedding
 
