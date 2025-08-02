@@ -17,6 +17,6 @@ config.py
 /extra_*
 /databases
 /KEMI_*
-/results
+/results*
 /helping_scripts/__*
 main.py

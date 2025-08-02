@@ -14,7 +14,7 @@ from config import (
     get_collection,
     get_results_filenames
 )
-# from norm_funcs import normalize_spaces
+from helping_scripts.norm_funcs import normalize_text
 
 if USE_LLM_ANSWERS:
     from helping_scripts.generate_llm_response import generate_response_from_context
@@ -53,15 +53,16 @@ def get_embedded_questions(toml_dir):
 # You can change range of loop to not shrink until the very last character
 # since that is a bad match anyway.
 def check_shrinking_matches_no_tolerance(text_list, chunk, shrink_from_start=False):
-    chunk = chunk.lower()
+    # chunk = chunk.lower()
+    chunk = normalize_text(chunk.lower())
     text_len = len(text_list)
     for i in range(text_len - MIN_ANS_LENGTH):
         current = text_list[i:] if shrink_from_start else text_list[: text_len - i]
         substring = "".join(current).lower()
         if substring in chunk:
             percent_match = 100.0 * len(current) / text_len
-            return True, percent_match, len(substring)
-    return False, 0, 0
+            return True, percent_match, len(substring), substring
+    return False, 0, 0, ""
 
 
 
@@ -100,8 +101,8 @@ all_columns = [
         "Page_Match", "Distance", "Text_Match_Start_Percent",
         "Match_Length_Start", "Text_Match_End_Percent",
         "Match_Length_End", "No_match", "Match_Threshold",
-        "Difficulty", "Category", "Expected_answer",
-        "Question", "Returned_Chunk", "Chunk_Id", "LLM_ANS"
+        "Difficulty", "Category", "Question", "Expected_answer",
+        "Returned_Chunk", "Chunk_Id", "Start_Match_String", "End_Match_String", "LLM_ANS"
     ]
 
 
@@ -158,8 +159,9 @@ def query_documents_all_embeddings(question, n_results=3):
             page_match = any(page in correct_pages for page in guessed_page_list) if filename_match else False
 
             (match_from_start_bool, match_from_start_float,
-                match_from_start_length, match_from_end_bool,
-                match_from_end_float, match_from_end_length,) = get_text_match_info(question, document)
+                match_from_start_length, match_from_start_string, 
+                match_from_end_bool, match_from_end_float,
+                match_from_end_length, match_from_end_string) = get_text_match_info(question, document)
             # We need to figure out what the thershold is, and how to calculate it. This adds both matches.
             # We could use match length somehow as well?
             match_threshold = (
@@ -186,10 +188,12 @@ def query_documents_all_embeddings(question, n_results=3):
                 match_threshold,
                 question["difficulty"],
                 question["category"],
-                question["answer"],
                 question["question"],
+                question["answer"],
                 document,
                 results["ids"][0][idx],
+                match_from_start_string,
+                match_from_end_string
             ]
             if not USE_LLM_ANSWERS:
                 row.append("No LLM answer")

@@ -121,7 +121,7 @@ page_numbers = [702]
 # [[questions]]
 # id = "RN073"
 # question = "Vilka sex syften med betyg nämns i utredningen?"
-# answer = "Urval, information, motivation, diagnos, certifiering och resultatrapportering."
+# answer = "Urval, information, motivation, diagnos, certifiering och resultatrapportering"
 # difficulty = "hard"
 # category = "education"
 # [[questions.files]]

@@ -1,19 +1,23 @@
 import re
 
+LINEBREAKS = r"(?:\r\n|\r|\n|\u2028|\u2029)"
+HYPHENS = r"[-‐‑‒–—−]"
 CONTROL_SPACE_REGEX = re.compile(
-    r'[\x00-\x1F\x7F\u00A0\u1680\u180E\u2000-\u200F\u2028\u2029\u202F\u205F\u2060\u2061\u2062\u2063\u2064\uFEFF]'
+    r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\u00A0\u1680\u180E\u2000-\u200F\u202F\u205F\u2060-\u2064\uFEFF]'
 )
 
 # Norm 1
 def normalize_text(input_text):
-    # Remove split words at the end of lines
-    normalized = re.sub(r"- ?\n", "", input_text.strip())
-    # Replace any sequence of whitespace (including newlines) with a single space
-    normalized = re.sub(r"\s+", " ", normalized)
-    # Don't keep space if end of sentence
-    normalized = re.sub(r" +\.\s", ". ", normalized)
+    # Remove control/invisible characters
+    input_text = CONTROL_SPACE_REGEX.sub('', input_text)
+    # Remove hyphenated linebreaks (e.g., "för-\ngrening" -> "förgrening")
+    input_text = re.sub(HYPHENS + r"\s*" + LINEBREAKS + r"\s*", "", input_text)
+    # Normalize all remaining whitespace to a single space
+    input_text = re.sub(r"\s+", " ", input_text)
+    # Clean up spacing before period
+    input_text = re.sub(r" +\.\s", ". ", input_text)
 
-    return normalized
+    return input_text.strip()
 
 # Norm 2
 def clean_md_text(text):

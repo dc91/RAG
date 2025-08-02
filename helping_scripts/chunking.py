@@ -7,7 +7,7 @@ from config import (
     TOKEN_ENCODER,
     USE_OPENAI
 )
-from generate_llm_response import generate_partial_context
+from helping_scripts.generate_llm_response import generate_partial_context
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 #------------------------------------#

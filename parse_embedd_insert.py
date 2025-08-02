@@ -14,12 +14,13 @@ from config import (
     EMBEDDING_MODEL_NAME,
     USE_RECURSIVE_SPLIT,
     PARSE_AS_MD,
+    NORMALIZE_AT_PARSE,
     get_collection,
     get_client
 )
-from helping_scripts.chunking_kemi import chunk_pdf_recursive_token_size, chunk_pdf_by_tokens
-# from helping_scripts.chunking import chunk_pdf_recursive_token_size, chunk_pdf_by_tokens
-# from norm_funcs import normalize_spaces
+# from helping_scripts.chunking_kemi import chunk_pdf_recursive_token_size, chunk_pdf_by_tokens
+from helping_scripts.chunking import chunk_pdf_recursive_token_size, chunk_pdf_by_tokens
+from helping_scripts.norm_funcs import normalize_text
 
 collection = get_collection() # set up db
 client = get_client() # Client for embeddings
@@ -38,7 +39,8 @@ def parse_document(pdf_path):
         else:
             text = page.get_text(sort=True) # sort helps keep the right reading order in the page
         if text.strip():  # Skip empty pages
-            # norm_text = normalize_spaces(text)
+            if NORMALIZE_AT_PARSE:
+                text = normalize_text(text)
             text_and_pagenumber.append((i + 1, text + " "))
     doc.close()
     return text_and_pagenumber

@@ -24,17 +24,18 @@ JINA_KEY = os.getenv("JINA_API_KEY")
 #---------------------------------------#
 #---------------Directories-------------#
 #---------------------------------------#
-PDF_DIRECTORY = "KEMI_PDF_SMALL"
-TOML_DIRECTORY_CLEANED = "questions/kemi_raw"
-TOML_DIRECTORY_EMBEDDED = "questions/embedded_kemi_md"
+PDF_DIRECTORY = "pdf_data"
+TOML_DIRECTORY_CLEANED = "questions/cleaned"
+TOML_DIRECTORY_EMBEDDED = "questions/embedded"
 OUTPUT_DIRECTORY_COMPARE_SPLITS = "compare_splits_from_parser"
-RESULTS_DIRECTORY = "results"
-MD_DIRECTORY = "md_data/md"
-
+RESULTS_DIRECTORY = "results_new"
+MD_DIRECTORY = "md_data/md" # If you choose 
+LOCAL_BASE_URL = "http://192.168.8.3:1234/v1"
 
 #---------------------------------------#
 #------------General Settings-----------#
 #---------------------------------------#
+BASE_NAME = "RECURSIVE"
 USE_OPENAI = True
 ADD_LLM_CONTEXT = False
 RERANK = False
@@ -45,8 +46,9 @@ RERANK_MODEL = "COHERE"# "COHERE", "JINA_API" or "JINA_LOCAL"
 #----------------Parsing----------------#
 #---------------------------------------#
 PARSE_AS_MD = True
-USE_RECURSIVE_SPLIT = False
-MAX_TOKENS = 512
+USE_RECURSIVE_SPLIT = True
+NORMALIZE_AT_PARSE = False
+MAX_TOKENS = 128
 OVERLAP =  0
 
 
@@ -76,14 +78,17 @@ def get_client():
     if USE_OPENAI:
         return OpenAI(api_key=OPENAI_KEY)
     else:
-        return OpenAI(base_url="http://192.168.56.1:1234/v1", api_key="not-needed")
+        return OpenAI(base_url=LOCAL_BASE_URL, api_key="not-needed")
         # return Mistral(api_key=MISTRAL_KEY)
 
 
 #---------------------------------------#
-# -----------ChromaDB Configs-----------#
+#---Automatic naming of VERSION_NAME----#
 #---------------------------------------#
-BASE_NAME_VERSION = "CONTXT_KEMI_TEST3_BASE_N0"
+NORM_NR = 1 if NORMALIZE_AT_PARSE else 0
+BASE_NAME_VERSION = f"{BASE_NAME}_N{NORM_NR}"
+if PARSE_AS_MD:
+    BASE_NAME_VERSION = f"MD_{BASE_NAME_VERSION}"
 COS = True
 if COS:
     BASE_NAME_VERSION = f"COS_{BASE_NAME_VERSION}"
@@ -92,7 +97,11 @@ if OVERLAP > 0:
     VERSION_NAME = f"{BASE_NAME_VERSION}_{MAX_TOKENS}_Chunk_{OVERLAP}_Overlap"
 else:
     VERSION_NAME = f"{BASE_NAME_VERSION}_{MAX_TOKENS}_Chunk"
-    
+
+
+#---------------------------------------#
+# -----------ChromaDB Configs-----------#
+#---------------------------------------#    
 COLLECTION_NAME = f"docs_{VERSION_NAME}_collection"
 PERSIST_DIRECTORY = f"docs_{VERSION_NAME}_storage"
 
@@ -122,13 +131,13 @@ def get_collection():
 #---------------------------------------#
 #-------------Results Configs-----------#
 #---------------------------------------#
-MATCH_THRESHOLD = 80
+MATCH_THRESHOLD = 35
 MIN_ANS_LENGTH = 3
 RESULTS_PER_QUERY = 5
 FILTER_BY_REG_NR = False # Only applies to kemi data
 USE_LLM_ANSWERS = False
 LLM_USED = "_GEMMA" if USE_LLM_ANSWERS else "_No_LLM"
-LOCAL_BASE_URL = "http://192.168.8.3:1234/v1"
+
 
 if COS:
     DISTANCE = 0.55
@@ -155,7 +164,6 @@ Fokusera endast på vad utdraget handlar om och dess direkta omgivning. Undvik a
 Svaret ska vara på svenska, bestå av högst 200 tecken och innehålla endast en sammanhängande mening eller två. 
 Inga rubriker, metainformation eller hänvisningar till uppgiften får förekomma i svaret.
 """
-
 
 SYS_PROMPT_FOR_OUTPUT = """
 Använd endast det angivna kontextet för att besvara frågan. Lägg inte till information. 
