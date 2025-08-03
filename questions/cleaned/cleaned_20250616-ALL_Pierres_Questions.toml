@@ -1033,16 +1033,16 @@ page_numbers = [2]
 # file = "Mellan etik och AI.pdf"
 # page_numbers = [4]
 
-[[questions]]
-id = "PMCAI018"
-question = "Vilka var de tre temana som enkäterna visade?"
-answer = "Enkäterna visade även tre teman, vilka var, användning av generativ AI, tydliga riktlinjer och individuellt ansvar"
-difficulty = "Easy"
-category = "Research_methodology"
+# [[questions]]
+# id = "PMCAI018"
+# question = "Vilka var de tre temana som enkäterna visade?"
+# answer = "Enkäterna visade även tre teman, vilka var, användning av generativ AI, tydliga riktlinjer och individuellt ansvar"
+# difficulty = "Easy"
+# category = "Research_methodology"
 
-[[questions.files]]
-file = "Mellan etik och AI.pdf"
-page_numbers = [4]
+# [[questions.files]]
+# file = "Mellan etik och AI.pdf"
+# page_numbers = [4]
 
 [[questions]]
 id = "PMCAI019"
@@ -2557,7 +2557,7 @@ id = "PMCCHEM005"
 question = "Vilken var avgiften för prövning av ansökan?"
 answer = "20 000 svenska kronor"
 difficulty = "Easy"
-category = "Economics"
+category = "Economy"
 
 [[questions.files]]
 file = "6026_Beslut_2025-00-13.pdf"

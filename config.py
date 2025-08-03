@@ -45,10 +45,10 @@ RERANK_MODEL = "COHERE"# "COHERE", "JINA_API" or "JINA_LOCAL"
 #---------------------------------------#
 #----------------Parsing----------------#
 #---------------------------------------#
-PARSE_AS_MD = False
+PARSE_AS_MD = True
 USE_RECURSIVE_SPLIT = False
 NORMALIZE_AT_PARSE = False
-MAX_TOKENS = 128
+MAX_TOKENS = 256
 OVERLAP =  0
 
 
@@ -89,7 +89,7 @@ NORM_NR = 1 if NORMALIZE_AT_PARSE else 0
 BASE_NAME_VERSION = f"{BASE_NAME}_N{NORM_NR}"
 if PARSE_AS_MD:
     BASE_NAME_VERSION = f"MD_{BASE_NAME_VERSION}"
-COS = True
+COS = False
 if COS:
     BASE_NAME_VERSION = f"COS_{BASE_NAME_VERSION}"
     
@@ -140,7 +140,7 @@ LLM_USED = "_GEMMA" if USE_LLM_ANSWERS else "_No_LLM"
 
 
 if COS:
-    DISTANCE = 0.55
+    DISTANCE = 0.45
 else:
     DISTANCE = 0.85
 OUTPUT_DIRECTORY_RESULTS = f"{RESULTS_DIRECTORY}/{VERSION_NAME}/"
