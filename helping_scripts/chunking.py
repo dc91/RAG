@@ -17,7 +17,7 @@ def encode_text(text):
     return (
         TOKEN_ENCODER.encode(text, disallowed_special=())
         if USE_OPENAI else
-        TOKEN_ENCODER.encode(text=text, add_special_tokens=False)
+        TOKEN_ENCODER.encode(text=text, add_special_tokens=False, truncation=True, max_length=512)
     )
 
 def get_token_count(string: str) -> int:

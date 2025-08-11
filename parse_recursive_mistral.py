@@ -8,19 +8,15 @@ import fitz  # PyMuPDF
 import os
 # from concurrent.futures import ThreadPoolExecutor, as_completed
 # import multiprocessing
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from ratelimit import limits, sleep_and_retry
 
 from config import (
     PDF_DIRECTORY,
     EMBEDDING_MODEL_NAME,
-    TOKEN_ENCODER,
-    MAX_TOKENS,
-    OVERLAP,
-    USE_OPENAI,
     get_collection,
     get_client
 )
+from helping_scripts.chunking import chunk_pdf_recursive_token_size
 
 
 collection = get_collection() # set up db
@@ -30,7 +26,7 @@ client = get_client() # OpenAI client for embeddings
 # -----------------------------------------------#
 # --------------------Parse----------------------#
 # -----------------------------------------------#
-def parse_document(pdf_path):
+def parse_document(pdf_path, filename):
     doc = fitz.open(pdf_path)
     text_and_pagenumber = []  # List [(page_number, page_text)]
 
@@ -42,86 +38,6 @@ def parse_document(pdf_path):
     return text_and_pagenumber
 
 
-
-# -----------------------------------------------#
-# -------------Tokenize and Chunk up-------------#
-# -----------------------------------------------#
-def get_token_count(string: str) -> int:
-    """Returns the number of tokens in a text string."""
-    encoding = TOKEN_ENCODER
-    if USE_OPENAI:
-        num_tokens = len(encoding.encode(string, disallowed_special=()))
-    else:
-        num_tokens = len(encoding.encode(text=string, add_special_tokens=False))
-    return num_tokens
-
-def chunk_pdf_by_paragraph_tokens(pdf_path, MAX_TOKENS=MAX_TOKENS, OVERLAP=OVERLAP):
-    filename = os.path.basename(pdf_path)
-    text_and_pagenumber = parse_document(pdf_path)  # [(page_number, page_text)]
-    
-    splitter = RecursiveCharacterTextSplitter(
-        length_function=get_token_count,
-        chunk_size=MAX_TOKENS,
-        chunk_overlap=OVERLAP,
-        separators=["\n\n", "\n", ".", "?", "!", " ", ""]
-    )
-
-    all_paragraphs = []
-    paragraph_page_map = []
-
-    for page_number, page_text in text_and_pagenumber:
-        # Split by paragraphs on this page
-        paragraph_chunks = splitter.split_text(page_text)
-        all_paragraphs.extend(paragraph_chunks)
-        paragraph_page_map.extend([page_number] * len(paragraph_chunks))
-
-    # Now merge paragraphs into token-bounded chunks
-    chunks = []
-    current_chunk = []
-    current_token_count = 0
-    chunk_index = 1
-
-    def finalize_chunk():
-        nonlocal current_chunk, current_token_count, chunk_index
-        if not current_chunk:
-            return
-        chunk_text = " ".join(current_chunk)
-        token_chunk = TOKEN_ENCODER.encode(chunk_text, add_special_tokens=False)
-        page_list = sorted(set(chunk_page_numbers))
-        chunk_metadata = {
-            "id": f"{filename}_chunk{chunk_index}",
-            "filename": filename,
-            "page_number": ",".join(map(str, page_list)),
-            "chunk_index": chunk_index,
-        }
-        chunks.append({
-            "text": TOKEN_ENCODER.decode(token_chunk),
-            "metadata": chunk_metadata,
-        })
-        chunk_index += 1
-        current_chunk = []
-        current_token_count = 0
-
-    chunk_page_numbers = []
-
-    for paragraph, page_number in zip(all_paragraphs, paragraph_page_map):
-        tokens = TOKEN_ENCODER.encode(paragraph, add_special_tokens=False)
-        if current_token_count + len(tokens) > MAX_TOKENS:
-            finalize_chunk()
-            chunk_page_numbers = []
-        current_chunk.append(paragraph)
-        current_token_count += len(tokens)
-        chunk_page_numbers.append(page_number)
-
-    finalize_chunk()  # Catch the last one
-
-    total_chunks = len(chunks)
-    for chunk in chunks:
-        chunk["metadata"]["total_chunks"] = total_chunks
-
-    return chunks
-
-
 # -----------------------------------------------#
 # -----Embedd PDFs and Insert to ChromaDB--------#
 # -----------------------------------------------#
@@ -130,7 +46,7 @@ MAX_CALLS_PER_SECOND = 6
 @sleep_and_retry
 @limits(calls=MAX_CALLS_PER_SECOND, period=1)
 def call_embedding_api(model, inputs):
-    return client.embeddings.create(model=model, inputs=inputs)
+    return client.embeddings.create(model="mistral-embed", inputs=inputs)
 
 # Get embeddings of chunks from client, store with metadata in db
 def batch_embed_and_insert(chunks, batch_size=50):
@@ -159,7 +75,7 @@ def process_pdfs_and_insert(directory, batch_size=50):
         if filename.endswith(".pdf"):
             pdf_path = os.path.join(directory, filename)
             print(f"\n📄 Processing file: {filename}")
-            chunks = chunk_pdf_by_paragraph_tokens(pdf_path)
+            chunks = chunk_pdf_recursive_token_size(pdf_path, parse_document=parse_document)
 
             batch_embed_and_insert(chunks, batch_size=batch_size)
 

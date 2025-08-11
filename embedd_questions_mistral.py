@@ -12,7 +12,6 @@ from mistralai import Mistral
 from tomlkit import parse, dumps
 from tqdm import tqdm
 from config import (
-    EMBEDDING_MODEL_NAME, 
     MISTRAL_KEY, 
     TOML_DIRECTORY_CLEANED, 
     TOML_DIRECTORY_EMBEDDED
@@ -32,7 +31,7 @@ def rate_limited_embedding(question):
         if wait_time > 0:
             time.sleep(wait_time)
         last_call_time[0] = time.time()
-        return client.embeddings.create(model=EMBEDDING_MODEL_NAME, inputs=question).data[0].embedding
+        return client.embeddings.create(model="mistral-embed", inputs=question).data[0].embedding
 
 
 def add_embeddings_to_toml(toml_dir):

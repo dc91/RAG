@@ -7,7 +7,7 @@
 /temp_pdf
 /findPDF.py
 /txt_data
-/md_data
+/md_data*
 /md_data_NoPage
 /.vscode
 /docs*
@@ -18,5 +18,7 @@ config.py
 /databases
 /KEMI_*
 /results*
+/pdf_data_subset
 /helping_scripts/__*
 main.py
+File_IDs_Mistral*

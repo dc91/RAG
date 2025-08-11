@@ -1,6 +1,5 @@
 import requests
 import cohere
-
 # import torch
 from transformers import AutoModelForSequenceClassification
 from config import COHERE_KEY, JINA_KEY

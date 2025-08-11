@@ -3,12 +3,8 @@ import tiktoken
 from dotenv import load_dotenv
 from openai import OpenAI
 import chromadb
-from chromadb.utils import embedding_functions
-# from chromadb import EmbeddingFunction
-# from chromadb.utils.embedding_functions import MistralEmbeddingFunction
-# from chromadb.utils.embedding_functions import JinaEmbeddingFunction
-# from mistralai import Mistral
-# import requests
+from mistralai import Mistral
+import torch
 from transformers import AutoTokenizer, AutoModel
 
 #---------------------------------------#
@@ -24,31 +20,32 @@ JINA_KEY = os.getenv("JINA_API_KEY")
 #---------------------------------------#
 #---------------Directories-------------#
 #---------------------------------------#
-PDF_DIRECTORY = "pdf_data"
-TOML_DIRECTORY_CLEANED = "questions/cleaned"
-TOML_DIRECTORY_EMBEDDED = "questions/embedded"
+PDF_DIRECTORY = "pdf_data_subset"
+TOML_DIRECTORY_CLEANED = "questions/kemi_raw"
+TOML_DIRECTORY_EMBEDDED = "questions/embedded_kemi_md"
 OUTPUT_DIRECTORY_COMPARE_SPLITS = "compare_splits_from_parser"
 RESULTS_DIRECTORY = "results_new"
-MD_DIRECTORY = "md_data" # If you choose to pre-prase md-files
+MD_DIRECTORY = "md_data_kemi_mistral" # If you choose to pre-prase md-files
 LOCAL_BASE_URL = "http://192.168.8.3:1234/v1"
 
 #---------------------------------------#
 #------------General Settings-----------#
 #---------------------------------------#
-BASE_NAME = "BASELINE"
+BASE_NAME = "KEMI_RECURSIVE_MISTRAL_OCR"
 USE_OPENAI = True
-ADD_LLM_CONTEXT = False
+LOCAL_EMBEDDING_SERVER = False
+ADD_LLM_CONTEXT = True
 RERANK = False
-RERANK_MODEL = "COHERE"# "COHERE", "JINA_API" or "JINA_LOCAL"
-
+RERANK_MODEL = "JINA_API"# "COHERE", "JINA_API" or "JINA_LOCAL"
+COS = True
 
 #---------------------------------------#
 #----------------Parsing----------------#
 #---------------------------------------#
 PARSE_AS_MD = True
-USE_RECURSIVE_SPLIT = False
+USE_RECURSIVE_SPLIT = True
 NORMALIZE_AT_PARSE = False
-MAX_TOKENS = 256
+MAX_TOKENS = 2048
 OVERLAP =  0
 
 
@@ -56,30 +53,30 @@ OVERLAP =  0
 # --------------Embedding---------------#
 #---------------------------------------#
 EMBEDDING_MODEL_NAME = "text-embedding-3-small"
+# EMBEDDING_MODEL_NAME = "text-embedding-3-large"
 # EMBEDDING_MODEL_NAME = "jinaai/jina-embeddings-v3"
 # EMBEDDING_MODEL_NAME = "KBLab/sentence-bert-swedish-cased"
 # EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-large"
-# EMBEDDING_MODEL_NAME = "mistral-embed"
+# EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+# EMBEDDING_MODEL_NAME = "mistralai/Mixtral-8x7B-v0.1"
+
 
 if USE_OPENAI:
     TOKEN_ENCODER = tiktoken.encoding_for_model(EMBEDDING_MODEL_NAME)
-    EMBEDDING_FUNCTION = embedding_functions.OpenAIEmbeddingFunction(
-        api_key=OPENAI_KEY, 
-        model_name=EMBEDDING_MODEL_NAME
-    )
 else:
-    # TOKEN_ENCODER = AutoTokenizer.from_pretrained("mistralai/Mixtral-8x7B-v0.1")
-    # EMBEDDING_FUNCTION = MistralEmbeddingFunction(model=EMBEDDING_MODEL_NAME)
-    # EMBEDDING_FUNCTION = JinaEmbeddingFunction(model=EMBEDDING_MODEL_NAME)
-    AUTOMODEL_CUSTOM = AutoModel.from_pretrained(EMBEDDING_MODEL_NAME)
+    if not LOCAL_EMBEDDING_SERVER:
+        AUTOMODEL_CUSTOM = AutoModel.from_pretrained(EMBEDDING_MODEL_NAME, trust_remote_code=True)
+        AUTOMODEL_CUSTOM.eval()
     TOKEN_ENCODER = AutoTokenizer.from_pretrained(EMBEDDING_MODEL_NAME)
     
 def get_client():
     if USE_OPENAI:
         return OpenAI(api_key=OPENAI_KEY)
     else:
-        return OpenAI(base_url=LOCAL_BASE_URL, api_key="not-needed")
-        # return Mistral(api_key=MISTRAL_KEY)
+        if LOCAL_EMBEDDING_SERVER:
+            return OpenAI(base_url=LOCAL_BASE_URL, api_key="not-needed")
+        else:
+            return Mistral(api_key=MISTRAL_KEY)
 
 
 #---------------------------------------#
@@ -89,7 +86,7 @@ NORM_NR = 1 if NORMALIZE_AT_PARSE else 0
 BASE_NAME_VERSION = f"{BASE_NAME}_N{NORM_NR}"
 if PARSE_AS_MD:
     BASE_NAME_VERSION = f"MD_{BASE_NAME_VERSION}"
-COS = False
+
 if COS:
     BASE_NAME_VERSION = f"COS_{BASE_NAME_VERSION}"
     
@@ -119,28 +116,27 @@ def get_collection():
                     "max_neighbors": 32,
                     "num_threads": 8
                 },
-                "embedding_function": EMBEDDING_FUNCTION,
             }
         )
     else:
         return chroma_client.get_or_create_collection(
-            name=COLLECTION_NAME, embedding_function=EMBEDDING_FUNCTION
+            name=COLLECTION_NAME
         )
 
 
 #---------------------------------------#
 #-------------Results Configs-----------#
 #---------------------------------------#
-MATCH_THRESHOLD = 35
+MATCH_THRESHOLD = 50
 MIN_ANS_LENGTH = 3
 RESULTS_PER_QUERY = 5
 FILTER_BY_REG_NR = False # Only applies to kemi data
 USE_LLM_ANSWERS = False
-LLM_USED = "_GEMMA" if USE_LLM_ANSWERS else "_No_LLM"
+LLM_USED = "_MISTRAL" if USE_LLM_ANSWERS else "_No_LLM"
 
 
 if COS:
-    DISTANCE = 0.45
+    DISTANCE = 0.55
 else:
     DISTANCE = 0.85
 OUTPUT_DIRECTORY_RESULTS = f"{RESULTS_DIRECTORY}/{VERSION_NAME}/"
@@ -171,3 +167,22 @@ Om du inte kan svaret på frågan i kontextet, säg att du inte vet svaret.
 Det första stycket i kontextet har störst chans att innehålla svaret. 
 Var kort och koncis och svara alltid på svenska.
 """
+
+#---------------------------------------#
+#-----------AUTOMODEL POOLING-----------#
+#---------------------------------------#
+def pooling_setup(texts):
+    if isinstance(texts, str):
+        texts = [texts]
+    inputs = TOKEN_ENCODER(texts, padding=True, truncation=True, return_tensors="pt", max_length=512)
+    with torch.no_grad():
+        outputs = AUTOMODEL_CUSTOM(**inputs)
+        last_hidden_state = outputs.last_hidden_state
+
+        # Mean Pooling
+        attention_mask = inputs['attention_mask']
+        mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+        pooled = torch.sum(last_hidden_state * mask_expanded, 1) / torch.clamp(mask_expanded.sum(1), min=1e-9)
+
+    embeddings = pooled.cpu().tolist()  # Convert to list-of-lists for ChromaDB
+    return embeddings

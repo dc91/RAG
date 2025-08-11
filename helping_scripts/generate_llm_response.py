@@ -1,5 +1,9 @@
-from openai import OpenAI
+import sys
+import os
+# Add parent directory to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from openai import OpenAI
 from config import LOCAL_BASE_URL#, get_client
 
 def generate_partial_context(question, relevant_chunks, sys_prompt):
@@ -8,7 +12,7 @@ def generate_partial_context(question, relevant_chunks, sys_prompt):
     # client = get_client()
     client = OpenAI(base_url=LOCAL_BASE_URL, api_key="not-needed")
     response = client.chat.completions.create(
-        model="local",  # Add proper model name if not using local model, 'gpt-4.1-nano' for example
+        model="gpt-4.1-nano",  # Add proper model name if not using local model, 'gpt-4.1-nano' for example
         messages=[
             {
                 "role": "system",

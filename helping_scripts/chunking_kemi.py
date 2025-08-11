@@ -19,7 +19,7 @@ def encode_text(text):
     return (
         TOKEN_ENCODER.encode(text, disallowed_special=())
         if USE_OPENAI else
-        TOKEN_ENCODER.encode(text=text, add_special_tokens=False)
+        TOKEN_ENCODER.encode(text=text, add_special_tokens=False, truncation=True, max_length=512)
     )
 
 def get_token_count(string: str) -> int:
@@ -46,7 +46,7 @@ def chunk_pdf_by_page(pdf_path, parse_document):
     filename = os.path.basename(pdf_path)
     match = re.search(r'(?<=_)\d{4}-\d{2}-\d{2}(?=\.)', filename)
     file_date = match.group()
-    text_and_pagenumber = parse_document(pdf_path)  # List [(page_number, page_text)]
+    text_and_pagenumber = parse_document(pdf_path, filename)  # List [(page_number, page_text)]
     chunks = []
     
     for page_number, page_text in text_and_pagenumber:
@@ -74,7 +74,7 @@ def chunk_pdf_by_tokens(pdf_path, parse_document, max_tokens=MAX_TOKENS, overlap
     filename = os.path.basename(pdf_path)
     match = re.search(r'(?<=_)\d{4}-\d{2}-\d{2}(?=\.)', filename)
     file_date = match.group()
-    text_and_pagenumber = parse_document(pdf_path)  # List [(page_number, page_text)]
+    text_and_pagenumber = parse_document(pdf_path, filename)  # List [(page_number, page_text)]
     chunks = []
     all_tokens = []
     token_page_map = []  # Keeps track of which page each token came from, [page number of token1, token2, token3 ...]
@@ -127,7 +127,7 @@ def chunk_pdf_recursive_token_size(pdf_path, parse_document, max_tokens=MAX_TOKE
     file_date = ""
     if match:
         file_date = match.group()
-    text_and_pagenumber = parse_document(pdf_path)  # [(page_number, page_text)]
+    text_and_pagenumber = parse_document(pdf_path, filename)  # [(page_number, page_text)]
     
     splitter = RecursiveCharacterTextSplitter(
         length_function=get_token_count,

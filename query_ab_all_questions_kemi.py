@@ -1,4 +1,5 @@
 import os
+# import re
 import pandas as pd
 import tomli
 from tqdm import tqdm
@@ -15,7 +16,7 @@ from config import (
     get_collection,
     get_results_filenames
 )
-# from norm_funcs import normalize_spaces
+# from helping_scripts.norm_funcs import normalize_text, normalize_spaces
 
 if USE_LLM_ANSWERS:
     from helping_scripts.generate_llm_response import generate_response_from_context
@@ -57,8 +58,13 @@ def get_embedded_questions(toml_dir):
 # since that is a bad match anyway.
 def check_shrinking_matches_no_tolerance(text_list, chunk, shrink_from_start=False):
     chunk = chunk.lower()
-    # chunk = normalize_spaces(chunk) # If not using markdown, helps with matching
+    # chunk = normalize_text(chunk) # If not using markdown, helps with matching
+    # chunk = re.sub(r"\s+", "", chunk)
+    # chunk = re.sub(r"\|", "", chunk)
+    # text_list_temp = [char for char in text_list if not re.fullmatch(r'\s*|\|', char)]
+    # text_list = text_list_temp
     text_len = len(text_list)
+    print("Chunk: ", chunk, "\n\nAnswer: ", "".join(text_list))
     for i in range(text_len - MIN_ANS_LENGTH):
         current = text_list[i:] if shrink_from_start else text_list[: text_len - i]
         substring = "".join(current).lower()
@@ -69,7 +75,7 @@ def check_shrinking_matches_no_tolerance(text_list, chunk, shrink_from_start=Fal
 
 
 # Only applies to non-markdown toml files, markdown toml files have different answer structure
-def clean_element(element,):  
+def clean_element(element):  
     if "Tabell:" in element:
         parts = element.split("Tabell:")
         if parts[0].strip():  # If there's text before "Tabell:"
@@ -178,14 +184,14 @@ def query_documents_all_embeddings(questions, n_results=3):
             # Get text match info
             (match_from_start_bool, match_from_start_float, match_from_start_length) = (
                 check_shrinking_matches_no_tolerance(
-                    list(question["files"][file_index_answer]["file_answer"]),
+                    list(question["files"][file_index_answer]["file_answer"].lower()),
                     document,
                     shrink_from_start=False,
                 )
             )
             (match_from_end_bool, match_from_end_float, match_from_end_length) = (
                 check_shrinking_matches_no_tolerance(
-                    list(question["files"][file_index_answer]["file_answer"]),
+                    list(question["files"][file_index_answer]["file_answer"].lower()),
                     document,
                     shrink_from_start=True,
                 )

@@ -17,16 +17,20 @@ from config import (
     USE_RECURSIVE_SPLIT,
     PARSE_AS_MD,
     NORMALIZE_AT_PARSE,
+    USE_OPENAI,
+    LOCAL_EMBEDDING_SERVER,
     get_collection,
-    get_client
+    get_client,
+    pooling_setup
 )
 # from helping_scripts.chunking_kemi import chunk_pdf_recursive_token_size, chunk_pdf_by_tokens
 from helping_scripts.chunking import chunk_pdf_recursive_token_size, chunk_pdf_by_tokens
 from helping_scripts.norm_funcs import normalize_text
+# from docling.document_converter import DocumentConverter
 
 collection = get_collection() # set up db
 client = get_client() # Client for embeddings
-
+# converter = DocumentConverter()
 
 # -----------------------------------------------#
 # --------------------Parse----------------------#
@@ -34,14 +38,17 @@ client = get_client() # Client for embeddings
 def parse_document(pdf_path, filename):
     doc = fitz.open(pdf_path)
     text_and_pagenumber = []  # List [(page_number, page_text)]
-
+    
     for i, page in enumerate(doc):
+        # docling_page = converter.convert(pdf_path, page_range=[i+1,i+1])
         if PARSE_AS_MD:
             md_path = os.path.join(MD_DIRECTORY, filename[:-4] + f"_page{i+1}.md")
             with open(md_path, 'r', encoding='utf-8') as f:
                 text = f.read()
+            # If you have not pre parsed to md, you can parse here
             # text = pymupdf4llm.to_markdown(doc, pages=[i])
         else:
+            # text = docling_page.document.export_to_text()
             text = page.get_text(sort=True) # sort helps keep the right reading order in the page
         if text.strip():  # Skip empty pages
             if NORMALIZE_AT_PARSE:
@@ -60,13 +67,17 @@ def embed_and_insert_batch(chunks, batch_size=50):
     for i in tqdm(range(0, len(chunks), batch_size), desc="Embedding and inserting batches"):
         batch = chunks[i : i + batch_size]
         texts = [chunk["text"] for chunk in batch]
+        # texts = [f"Passage: {text}" for text in texts] # For some models
         metadatas = [chunk["metadata"] for chunk in batch]
         ids = [chunk["metadata"]["id"] for chunk in batch]
 
         try:
-            response = client.embeddings.create(input=texts, model=EMBEDDING_MODEL_NAME)
-            embeddings = [d.embedding for d in response.data]
-
+            if USE_OPENAI or LOCAL_EMBEDDING_SERVER:
+                response = client.embeddings.create(input=texts, model=EMBEDDING_MODEL_NAME)
+                embeddings = [d.embedding for d in response.data]
+            else:
+                embeddings = pooling_setup(texts)
+                
             collection.upsert(
                 ids=ids,
                 documents=texts,

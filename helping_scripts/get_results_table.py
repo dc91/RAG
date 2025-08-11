@@ -1,7 +1,12 @@
+import sys
 import os
-import csv
+# Add parent directory to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-root_dir = 'results'
+import csv
+from config import RESULTS_DIRECTORY
+
+root_dir = RESULTS_DIRECTORY
 output_csv = 'metrics_summary.csv'
 
 # Map of base metric names to the line prefixes in the text files

@@ -16,20 +16,24 @@ from config import (
     TOML_DIRECTORY_EMBEDDED,
     EMBEDDING_MODEL_NAME,
     get_client,
+    pooling_setup,
+    USE_OPENAI,
+    LOCAL_EMBEDDING_SERVER,
     # AUTOMODEL_CUSTOM # If using AutoModel, from transformers library
 )
 
 BATCH_SIZE = 50
-client = get_client()
 
-# If using AutoModel, from transformers library. Make sure to adjust for the specific model.
-# def get_embedding(question): 
-#     emb = AUTOMODEL_CUSTOM.encode(question, task="retrieval.query").tolist()
-#     return emb
     
 def get_embedding(question):
-    return client.embeddings.create(input=question, model=EMBEDDING_MODEL_NAME).data[0].embedding
-
+    if USE_OPENAI or LOCAL_EMBEDDING_SERVER:
+        return get_client().embeddings.create(input=question, model=EMBEDDING_MODEL_NAME).data[0].embedding
+    else:
+        # If using AutoModel, from transformers library. Make sure to adjust for the specific model.
+        formatted_question = f"Query: {question}"
+        return pooling_setup(formatted_question)[0]
+    
+    
 def add_embeddings_to_toml(toml_dir):
     toml_files = [f for f in os.listdir(toml_dir) if f.endswith(".toml")]
     
@@ -39,7 +43,7 @@ def add_embeddings_to_toml(toml_dir):
             toml_file_edit = parse(f.read())
         for i in range(0, len(toml_file_edit["questions"]), BATCH_SIZE):
             batch = toml_file_edit["questions"][i:i + BATCH_SIZE]
-            
+
             for question in batch:
                 question["question_embedding"] = get_embedding(question["question"])
         os.makedirs(TOML_DIRECTORY_EMBEDDED, exist_ok=True)
