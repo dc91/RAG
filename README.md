@@ -1,13 +1,13 @@
 # Description
 This is a modular python pipeline for RAG with ChromaDB vector database. There are 4 main files:
 
-* config.py - This is where all settings are set.
+* `config.py` - This is where all settings are set.
 
-* parse_embedd_insert.py - Run this to parse files, chunk up, embed, and insert into ChromaDB
+* `parse_embedd_insert.py` - Run this to parse files, chunk up, embed, and insert into ChromaDB
 
-* embedd_toml_questions.py - Adds a field with embeddings for all questions in TOML_DIRECTORY (config.py), and saves new files to TOML_DIRECTORY_EMBEDDED (config.py).
+* `embedd_toml_questions.py` - Adds a field with embeddings for all questions in TOML_DIRECTORY (`config.py`), and saves new files to TOML_DIRECTORY_EMBEDDED (`config.py`).
 
-* query_db_all_questions.py - Run this to query the database with all saved questions, and save results.
+* `query_db_all_questions.py` - Run this to query the database with all saved questions, and save results.
 
 # Dependencies
 ```python
@@ -64,10 +64,10 @@ RAG_MOD
 This section will give an overview to the modularity of the pipeline. 
 
 #### Config
-All settings are set in config.py. This is where embedding models, parsers, directories, boolean flags and input/output options can be set.
+All settings are set in `config.py`. This is where embedding models, parsers, directories, boolean flags and input/output options can be set.
 
 #### Parse
-PyMuPDF and Docling can be used to parse PDF files as text, while PyMuPDF4llm and Docling can be used for markdown conversion. There is an option to pre-parse PDF files as markdown files (parse_pdf_save_md_files.py), so that it can be done in advance and used multiple times. 
+PyMuPDF and Docling can be used to parse PDF files as text, while PyMuPDF4llm and Docling can be used for markdown conversion. There is an option to pre-parse PDF files as markdown files (`parse_pdf_save_md_files.py`), so that it can be done in advance and used multiple times. 
 
 #### Chunk
 There are two chunking strategies available, both are token based. 
@@ -101,13 +101,11 @@ There are several settings to vary for querying and result retreival, such as:
 * Generating LLM response
 
 
-
-
 # config.py - Variables
 Here we specify what the various settings do.
 
 ## API keys
-Keys are saved in a .env file, and loaded here:
+Keys are saved in a `.env file`, and loaded here:
 ```python
 #---------------------------------------#
 #-----------------KEYS------------------#
@@ -148,37 +146,33 @@ RERANK_MODEL = "JINA_API"# "COHERE", "JINA_API" or "JINA_LOCAL"
 COS = True
 ```
 
-```
-    USE_OPENAI controls which client and tokenizer is loaded, together with LOCAL_EMBEDDING_SERVER. 
 
-    If USE_OPENAI == true, it uses OpenAI's client and tiktoken as tokenizer. 
+* `USE_OPENAI` controls which client and tokenizer is loaded, together with `LOCAL_EMBEDDING_SERVER`. 
 
-    If USE_OPENAI == false it either uses the local client (if LOCAL_EMBEDDING_SERVER == True),
+* If `USE_OPENAI == true`, it uses OpenAI's client and tiktoken as tokenizer. 
+
+* If `USE_OPENAI == false` it either uses the local client (if `LOCAL_EMBEDDING_SERVER == True`),
     or uses the Mistral client. In both cases it uses AutoTokenizer to load the tokenizer. 
 
-    LOCAL_EMBEDDING_SERVER == True, also loads the local embedding model with AutoModel. 
-```
+* `LOCAL_EMBEDDING_SERVER == True`, also loads the local embedding model with AutoModel. 
 
-```
-    ADD_LLM_CONTEXT == True, Will use the generate_partial_context method from 
-        generate_llm_response.py to generate some context for the current chunk. 
+
+* `ADD_LLM_CONTEXT` == True, Will use the generate_partial_context method from 
+        `generate_llm_response.py` to generate some context for the current chunk. 
         It does this by adding current and previous page as context to a local LLM server,
-        which is fed the system prompt (SYS_PROMPT_FOR_CONTEXT) to generate the desired context. 
+        which is fed the system prompt (`SYS_PROMPT_FOR_CONTEXT`) to generate the desired context. 
         The context is prepended to the chunk before embedding and inserting to database.
-```
 
-```
-    RERANK == True, Will use the rerank model specified with RERANK_MODEL to rerank the results at query. 
-        The reranking methods are specified in reranking.py. 
-        There are 3 choices for reranking: "COHERE", "JINA_API" or "JINA_LOCAL". 
+
+* RERANK == True, Will use the rerank model specified with `RERANK_MODEL` to rerank the results at query. 
+        The reranking methods are specified in `reranking.py`. 
+        There are 3 choices for reranking: `"COHERE"`, `"JINA_API"` or `"JINA_LOCAL"`. 
         The first two require an API key.
-```
 
-```
-    COS, Toggles the space type in the database.
-    If COS == False, linear space will be used.
-    If COS == True, cosine space will be used.
-```
+
+* `COS`, Toggles the space type in the database.
+If `COS == False`, linear space will be used.
+If `COS == True`, cosine space will be used.
 
 ## Parsing
 ```python
@@ -192,31 +186,26 @@ MAX_TOKENS = 2048
 OVERLAP =  0
 ```
 
-```
-    It is suggested to pre-parse to markdown file with pre_parse_pdf_save_md_files.py, 
+* It is suggested to pre-parse to markdown file with `pre_parse_pdf_save_md_files.py`, 
         if that is the desired parsing method. 
 
-    After that, you can run parse_embedd_insert.py to parse all files in PDF_DIRECTORY 
-        if normal text parsing is used, or MD_DIRECTORY if markdown is used.
-```
+* After that, you can run `parse_embedd_insert.py` to parse all files in `PDF_DIRECTORY` 
+        if normal text parsing is used, or `MD_DIRECTORY` if markdown is used.
 
-```
-    PARSE_AS_MD = True, Will use the pre-parsed markdown files in MD_DIRECTORY to embed and insert.
-```
 
-```
-    USE_RECURSIVE_SPLIT, Toggles between chunking strategies: regular and recursive split,
-    specified in chunking.py.
-```
-```
-    NORMALIZE_AT_PARSE, Toggles usage of normalization at parse.
-    Normalizing methods are specified in norm_funcs.py.
-```
-```
-    MAX_TOKENS, Sets max number of tokens.
+* `PARSE_AS_MD = True`, Will use the pre-parsed markdown files in `MD_DIRECTORY` to embed and insert.
 
-    OVERLAP, Sets overlap, measured in tokens.
-```
+
+* `USE_RECURSIVE_SPLIT`, Toggles between chunking strategies: regular and recursive split,
+    specified in `chunking.py`.
+
+* `NORMALIZE_AT_PARSE`, Toggles usage of normalization at parse.
+Normalizing methods are specified in `norm_funcs.py`.
+
+* `MAX_TOKENS`, Sets max number of tokens.
+
+* `OVERLAP`, Sets overlap, measured in tokens.
+
 
 ## Embeddings
 ```python
@@ -246,12 +235,9 @@ def get_client():
             return Mistral(api_key=MISTRAL_KEY)
 ```
 
-```
-    EMBEDDING_MODEL_NAME is used to specify which embedding model and tokenizer to load.
-```
-```
-    get_client() returns the client, which depends on previously set booleans.
-```
+* `EMBEDDING_MODEL_NAME` is used to specify which embedding model and tokenizer to load.
+
+* `get_client()` returns the client, which depends on previously set booleans.
 
 ## File naming
 For automatic naming of output files and directories. 
@@ -304,12 +290,11 @@ def get_collection():
         )
 ```
 
-```
-    get_collection() will create, or return, the specified collection (COLLECTION_NAME).
-```
+* `get_collection()` will create, or return, the specified collection (`COLLECTION_NAME`).
+
 
 ## Results
-Configurations for results. These are used at query, by query_db_all_questions.py.
+Configurations for results. These are used at query, by `query_db_all_questions.py`.
 ```python
 #---------------------------------------#
 #-------------Results Configs-----------#
@@ -338,37 +323,23 @@ def get_results_filenames():
 
 ```
 
-```
-    MATCH_THRESHOLD, sets the threshold for what is considered a text match, in percent. The number is a sum and represents how much was kept of the shrinking answer to get a match. Since the text matching method checks for matches by shrinking the answer, once by shrinking the answer from the end, and a second time by shrinking the answer from the start of the answer string. The matches are summed up, meaning that the sum range is [0, 200%].
-```
+* `MATCH_THRESHOLD`, sets the threshold for what is considered a text match, in percent. The number is a sum and represents how much was kept of the shrinking answer to get a match. Since the text matching method checks for matches by shrinking the answer, once by shrinking the answer from the end, and a second time by shrinking the answer from the start of the answer string. The matches are summed up, meaning that the sum range is [0, 200%].
 
-```
-    MIN_ANS_LENGTH, sets the minimum number of characters for an answer to be considered, in the shrinking text matching method.
-```
+* `MIN_ANS_LENGTH`, sets the minimum number of characters for an answer to be considered, in the shrinking text matching method.
 
-```
-    RESULTS_PER_QUERY, sets the number of results to be returned by the database for each query.
-```
+* `RESULTS_PER_QUERY`, sets the number of results to be returned by the database for each query.
 
-```
-    FILTER_BY_REG_NR, only relevant for the chemistry dataset. 
+* `FILTER_BY_REG_NR`, only relevant for the chemistry dataset. 
     It applies metadata filtering, by registration number, at query.
-```
 
-```
-    USE_LLM_ANSWERS, toggles if local LLM is used to generate answers from the retrieved results, together with the query.
+* `USE_LLM_ANSWERS`, toggles if local LLM is used to generate answers from the retrieved results, together with the query.
 
-    LLM_USED, specifies which LLM was used. Only used for naming, is not used to load the actual LLM.
-```
+* `LLM_USED`, specifies which LLM was used. Only used for naming, is not used to load the actual LLM.
 
-```
-    DISTANCE, The filtering distance for returned results.
-```
+* `DISTANCE`, The filtering distance for returned results.
 
-```
-    OUTPUT_DIRECTORY_RESULTS, sets the path for the results
-    get_results_filenames(), sets and gets the filenames for result files.
-```
+* `OUTPUT_DIRECTORY_RESULTS`, sets the path for the results
+* `get_results_filenames()`, sets and gets the filenames for result files.
 
 ## System prompts for local LLMs
 These prompts are used by local LLM in generate_llm_response.py.
@@ -392,11 +363,9 @@ Var kort och koncis och svara alltid på svenska.
 """
 ```
 
-```
-    SYS_PROMPT_FOR_CONTEXT, is used when generating context for chunk.
+* `SYS_PROMPT_FOR_CONTEXT`, is used when generating context for chunk.
 
-    SYS_PROMPT_FOR_OUTPUT, is used when generating answer from returned chunks.
-```
+* `SYS_PROMPT_FOR_OUTPUT`, is used when generating answer from returned chunks.
 
 ## Automodel Pooling method
 Pooling method for AutoModel, check huggingface to ensure correct method is used for specific model.
