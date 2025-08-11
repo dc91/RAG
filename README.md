@@ -13,17 +13,18 @@ This is a modular python pipeline for RAG with ChromaDB vector database. There a
 
 # Dependencies
 ```python
-pip install chromadb openai pymupdf4llm tiktoken tomlkit tomli pandas matplotlib seaborn openpyxl tqdm joblib
+pip install chromadb openai mistralai langchain pymupdf4llm tiktoken tomlkit tomli pandas matplotlib seaborn openpyxl tqdm joblib docling cohere transformers
 ```
 
 # Usage
+Clone repo, add pdf files and questions into respective directories. Read through `config.py`!
 There is no 'main' file to run, start to finish. Instead, the config file decides all parameters, and you run the desired script, which will use config.py for importing settings.
 
 
 # File structure description
 packages/button
 ```
-RAG_MOD
+RAG
 ├── databases
 │   └── This is where your databases will be created.
 ├── helping_scripts
