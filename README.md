@@ -1,13 +1,13 @@
 # Description
 This is a modular python pipeline for RAG with ChromaDB vector database. There are 4 main files:
 
-    config.py - This is where all settings are set.
+* config.py - This is where all settings are set.
 
-    parse_embedd_insert.py - Run this to parse files, chunk up, embed, and insert into ChromaDB
+* parse_embedd_insert.py - Run this to parse files, chunk up, embed, and insert into ChromaDB
 
-    embedd_toml_questions.py - Adds a field with embeddings for all questions in TOML_DIRECTORY (config.py), and saves new files to TOML_DIRECTORY_EMBEDDED (config.py).
+* embedd_toml_questions.py - Adds a field with embeddings for all questions in TOML_DIRECTORY (config.py), and saves new files to TOML_DIRECTORY_EMBEDDED (config.py).
 
-    query_db_all_questions.py - Run this to query the database with all saved questions, and save results.
+* query_db_all_questions.py - Run this to query the database with all saved questions, and save results.
 
 # Dependencies
 ```python
@@ -88,13 +88,13 @@ There is a choice between linear space and cosine space for the vector database.
 #### Query
 There are several settings to vary for querying and result retreival, such as:
 
-    Match Thresholds
-    Minimum answer length
-    Nr of returned results
-    Metadata filtering
-    Distance filtering
-    Reranking
-    Generating LLM response
+* Match Thresholds
+* Minimum answer length
+* Nr of returned results
+* Metadata filtering
+* Distance filtering
+* Reranking
+* Generating LLM response
 
 
 
