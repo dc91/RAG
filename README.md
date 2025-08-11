@@ -14,6 +14,10 @@ This is a modular python pipeline for RAG with ChromaDB vector database. There a
 pip install chromadb openai pymupdf4llm tiktoken tomlkit tomli pandas matplotlib seaborn openpyxl tqdm joblib
 ```
 
+# Usage
+There is no 'main' file to run, start to finish. Instead, the config file decides all parameters, and you run the desired script, which will use config.py for importing settings.
+
+
 # File structure description
 packages/button
 ```
@@ -99,10 +103,8 @@ There are several settings to vary for querying and result retreival, such as:
 
 
 
-# config.py
+# config.py - Variables
 Here we specify what the various settings do.
-## Specification - Usage
-There is no 'main' file to run, start to finish. Instead, the config file decides all parameters, and you run the desired script, which will use config.py for importing settings.
 
 ## API keys
 Keys are saved in a .env file, and loaded here:
@@ -192,10 +194,10 @@ OVERLAP =  0
 
 ```
     It is suggested to pre-parse to markdown file with pre_parse_pdf_save_md_files.py, 
-    if that is the desired parsing method. 
+        if that is the desired parsing method. 
 
     After that, you can run parse_embedd_insert.py to parse all files in PDF_DIRECTORY 
-    if normal text parsing is used, or MD_DIRECTORY if markdown is used.
+        if normal text parsing is used, or MD_DIRECTORY if markdown is used.
 ```
 
 ```
@@ -419,12 +421,4 @@ def pooling_setup(texts):
     return embeddings
 ```
 
-## Extra settings - outside config.py
 
-
-# Resources
-chromadb:
-https://docs.trychroma.com/docs/overview/getting-started
-
-openai embeddings:
-https://platform.openai.com/docs/guides/embeddings
