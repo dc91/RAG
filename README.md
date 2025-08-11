@@ -1,5 +1,5 @@
 # Description
-This is a modular python pipeline for RAG with ChromaDB vector database. There are 4 main files:
+This is a modular python pipeline for RAG with ChromaDB vector database. There are 5 main files:
 
 * `config.py` - This is where all settings are set.
 
@@ -8,6 +8,8 @@ This is a modular python pipeline for RAG with ChromaDB vector database. There a
 * `embedd_toml_questions.py` - Adds a field with embeddings for all questions in TOML_DIRECTORY (`config.py`), and saves new files to TOML_DIRECTORY_EMBEDDED (`config.py`).
 
 * `query_db_all_questions.py` - Run this to query the database with all saved questions, and save results.
+
+* `save_stats_and_plots.ipynb` - Calculates and saves results, as well as plots.
 
 # Dependencies
 ```python
